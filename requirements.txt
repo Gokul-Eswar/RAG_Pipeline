@@ -16,6 +16,10 @@ qdrant-client
 # API
 fastapi
 uvicorn[standard]
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+slowapi
 
 # LLM & RAG Frameworks
 langchain
