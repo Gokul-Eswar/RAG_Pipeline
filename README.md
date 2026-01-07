@@ -4,18 +4,18 @@ An autonomous intelligence substrate integrating streaming data, knowledge graph
 
 ## Architecture
 
-This project implements a fully open-source stack as described in `context.md`:
+This project implements a fully open-source stack:
 
-| Component | Technology | Directory |
-|-----------|------------|-----------|
-| **Ingestion** | Redpanda (Kafka) | `/ingestion` |
-| **Processing** | Apache Spark | `/processing` |
-| **Extraction** | spaCy / Transformers | `/extraction` |
-| **Memory (Vector)** | Milvus / Qdrant | `/memory/vector` |
-| **Memory (Graph)** | Neo4j | `/memory/graph` |
-| **API** | FastAPI | `/api` |
-| **Orchestration** | Airflow / Dagster | `/orchestration` |
-| **LLM** | Ollama (LLaMA 3 / DeepSeek) | `/llm` |
+| Component | Technology |
+|-----------|------------|
+| **Ingestion** | Redpanda (Kafka) |
+| **Processing** | Apache Spark |
+| **Extraction** | spaCy / Transformers |
+| **Memory (Vector)** | Milvus / Qdrant |
+| **Memory (Graph)** | Neo4j |
+| **API** | FastAPI |
+| **Orchestration** | Airflow / Dagster |
+| **LLM** | Ollama (LLaMA 3 / DeepSeek) |
 
 ## Setup
 

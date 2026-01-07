@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Tiny launcher for local development.
+"""Application entry point for local development.
 
 Usage: `python run.py`
 """
-from big_data_rag.cli import main
+from src.core.cli import main
 
 
 def run():
+    """Run the application."""
     main()
 
 

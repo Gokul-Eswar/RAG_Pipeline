@@ -1,3 +1,5 @@
+"""Event ingestion API endpoints."""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
@@ -11,10 +13,11 @@ except ImportError:
     KafkaProducer = None
     KafkaError = None
 
-router = APIRouter(prefix="/ingest", tags=["ingest"])
+router = APIRouter(prefix="/ingest", tags=["Ingestion"])
 
 
-class IngestItem(BaseModel):
+class IngestEventRequest(BaseModel):
+    """Request schema for event ingestion."""
     id: str
     text: str
     metadata: dict | None = None
@@ -32,50 +35,45 @@ def get_kafka_producer():
     )
 
 
-@router.get("/health")
-def ingest_health():
-    """Health check for ingestion service."""
+@router.get("/health", description="Health check for ingestion service")
+def check_ingestion_health():
+    """Check Kafka/Redpanda connectivity."""
     broker = os.getenv("KAFKA_BROKER", "redpanda:9092")
     return {"kafka": broker, "status": "configured"}
 
 
-@router.post("/")
-def ingest(item: IngestItem):
-    """Ingest data into the streaming platform (Kafka/Redpanda).
+@router.post("/", description="Publish event to streaming platform")
+def ingest_event(request: IngestEventRequest):
+    """Publish a single event to the streaming platform (Kafka/Redpanda).
     
-    The item will be published to the configured Kafka topic for processing.
+    The event will be published to the configured Kafka topic for processing.
     """
-    if not item.text:
+    if not request.text:
         raise HTTPException(status_code=400, detail="text is required")
     
     try:
         producer = get_kafka_producer()
         if producer is None:
-            # Graceful fallback if Kafka is not available
             return {
                 "status": "accepted",
-                "id": item.id,
+                "id": request.id,
                 "warning": "Kafka producer not available - item queued locally"
             }
         
-        # Prepare the message
         message = {
-            "id": item.id,
-            "text": item.text,
-            "metadata": item.metadata or {},
+            "id": request.id,
+            "text": request.text,
+            "metadata": request.metadata or {},
         }
         
-        # Publish to Kafka
         topic = os.getenv("KAFKA_TOPIC_INGESTION", "raw_events")
         future = producer.send(topic, value=message)
-        
-        # Wait for confirmation with timeout
         record_metadata = future.get(timeout=10)
         producer.close()
         
         return {
             "status": "accepted",
-            "id": item.id,
+            "id": request.id,
             "topic": record_metadata.topic,
             "partition": record_metadata.partition,
             "offset": record_metadata.offset,
@@ -83,4 +81,4 @@ def ingest(item: IngestItem):
     except KafkaError as e:
         raise HTTPException(status_code=503, detail=f"Kafka error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to ingest item: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to ingest event: {str(e)}")

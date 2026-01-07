@@ -1,44 +1,50 @@
+"""Graph database API endpoints."""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
-from api.connectors.neo4j_client import Neo4jClient
+from src.infrastructure.database.neo4j import Neo4jGraphRepository
 
-router = APIRouter(prefix="/graph", tags=["graph"])
+router = APIRouter(prefix="/graph", tags=["Memory - Graph"])
 
 
-class NodeCreate(BaseModel):
+class NodeCreateRequest(BaseModel):
+    """Request to create a node."""
     label: str
     properties: dict
 
 
-class RelationshipCreate(BaseModel):
+class RelationshipCreateRequest(BaseModel):
+    """Request to create a relationship."""
     from_id: int
     relationship_type: str
     to_id: int
     properties: dict | None = None
 
 
-class NodeFind(BaseModel):
+class NodeQueryRequest(BaseModel):
+    """Request to query a node."""
     label: str
     properties: dict
 
 
-@router.get("/health")
-def graph_health():
+@router.get("/health", description="Check graph database connectivity")
+def check_graph_health():
+    """Check Neo4j graph database connectivity."""
     host = os.getenv("NEO4J_HOST", "neo4j")
     return {"neo4j": host, "status": "connected"}
 
 
-@router.post("/node")
-def create_node(node: NodeCreate):
+@router.post("/node", description="Create a node in the graph")
+def create_graph_node(request: NodeCreateRequest):
     """Create a new node in the graph database."""
-    if not node.label:
+    if not request.label:
         raise HTTPException(status_code=400, detail="label required")
     
     try:
-        client = Neo4jClient()
-        result = client.create_node(node.label, node.properties)
-        client.close()
+        repository = Neo4jGraphRepository()
+        result = repository.create_node(request.label, request.properties)
+        repository.close()
         
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
@@ -48,16 +54,21 @@ def create_node(node: NodeCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create node: {str(e)}")
 
 
-@router.post("/relationship")
-def create_relationship(rel: RelationshipCreate):
+@router.post("/relationship", description="Create a relationship between nodes")
+def create_graph_relationship(request: RelationshipCreateRequest):
     """Create a relationship between two nodes."""
-    if not rel.relationship_type:
+    if not request.relationship_type:
         raise HTTPException(status_code=400, detail="relationship_type required")
     
     try:
-        client = Neo4jClient()
-        result = client.create_relationship(rel.from_id, rel.relationship_type, rel.to_id, rel.properties)
-        client.close()
+        repository = Neo4jGraphRepository()
+        result = repository.create_relationship(
+            request.from_id, 
+            request.relationship_type, 
+            request.to_id, 
+            request.properties
+        )
+        repository.close()
         
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
@@ -67,13 +78,13 @@ def create_relationship(rel: RelationshipCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
 
 
-@router.post("/node/find")
-def find_node(query: NodeFind):
+@router.post("/node/find", description="Find a node by properties")
+def find_graph_node(request: NodeQueryRequest):
     """Find a node by label and properties."""
     try:
-        client = Neo4jClient()
-        result = client.find_node(query.label, query.properties)
-        client.close()
+        repository = Neo4jGraphRepository()
+        result = repository.find_node(request.label, request.properties)
+        repository.close()
         
         if result is None:
             raise HTTPException(status_code=404, detail="Node not found")
@@ -85,13 +96,13 @@ def find_node(query: NodeFind):
         raise HTTPException(status_code=500, detail=f"Failed to find node: {str(e)}")
 
 
-@router.delete("/node/{node_id}")
-def delete_node(node_id: int):
-    """Delete a node by ID."""
+@router.delete("/node/{node_id}", description="Delete a node by ID")
+def delete_graph_node(node_id: int):
+    """Delete a node from the graph by ID."""
     try:
-        client = Neo4jClient()
-        success = client.delete_node(node_id)
-        client.close()
+        repository = Neo4jGraphRepository()
+        success = repository.delete_node(node_id)
+        repository.close()
         
         if not success:
             raise HTTPException(status_code=404, detail="Node not found or already deleted")

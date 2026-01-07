@@ -1,33 +1,45 @@
+"""Qdrant vector database repository."""
+
 import os
 from typing import Optional, Dict, Any, List
 
 try:
     from qdrant_client import QdrantClient
     from qdrant_client.models import PointStruct, VectorParams, Distance
-except Exception:  # pragma: no cover - optional dependency during early dev
+except Exception:
     QdrantClient = None
     PointStruct = None
     VectorParams = None
     Distance = None
 
 
-def get_qdrant_client() -> Optional[QdrantClient]:
-    if QdrantClient is None:
-        return None
-    host = os.getenv("QDRANT_HOST", "qdrant")
-    port = int(os.getenv("QDRANT_PORT", "6333"))
-    return QdrantClient(url=f"http://{host}:{port}")
-
-
-class QdrantVectorStore:
-    """Client for Qdrant vector database operations."""
+class QdrantVectorRepository:
+    """Repository for Qdrant vector database operations.
+    
+    Provides an abstraction layer for managing vector embeddings
+    and performing semantic searches.
+    """
     
     def __init__(self, collection_name: str = None):
-        self.client = get_qdrant_client()
+        """Initialize the vector repository.
+        
+        Args:
+            collection_name: Name of vector collection (default from env)
+        """
+        self.client = self._get_client()
         self.collection_name = collection_name or os.getenv("QDRANT_COLLECTION_DEFAULT", "documents")
     
+    @staticmethod
+    def _get_client() -> Optional[QdrantClient]:
+        """Get Qdrant client instance."""
+        if QdrantClient is None:
+            return None
+        host = os.getenv("QDRANT_HOST", "qdrant")
+        port = int(os.getenv("QDRANT_PORT", "6333"))
+        return QdrantClient(url=f"http://{host}:{port}")
+    
     def create_collection(self, vector_size: int = 384, distance_metric: str = "cosine") -> bool:
-        """Create a new collection in Qdrant.
+        """Create a new vector collection.
         
         Args:
             vector_size: Dimensionality of vectors
@@ -40,7 +52,6 @@ class QdrantVectorStore:
             return False
         
         try:
-            # Map distance metric string to Qdrant enum
             distance_map = {
                 "cosine": Distance.COSINE,
                 "euclidean": Distance.EUCLID,
@@ -57,15 +68,14 @@ class QdrantVectorStore:
             print(f"Error creating collection: {e}")
             return False
     
-    def upsert_vectors(self, vectors: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Upsert vectors into the collection.
+    def upsert(self, vectors: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Insert or update vectors in the collection.
         
         Args:
-            vectors: List of dicts with 'id', 'vector', and optional 'payload'
-                     Example: [{"id": 1, "vector": [0.1, 0.2, ...], "payload": {"text": "..."}}]
-                     
+            vectors: List of vector objects with id, vector, and optional payload
+            
         Returns:
-            Dictionary with operation status
+            Status dictionary
         """
         if self.client is None:
             return {"error": "Qdrant client not available"}
@@ -88,11 +98,11 @@ class QdrantVectorStore:
         except Exception as e:
             return {"error": str(e)}
     
-    def search_vectors(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
+    def search(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
         """Search for similar vectors.
         
         Args:
-            query_vector: Vector to search for
+            query_vector: Query embedding vector
             limit: Maximum number of results
             
         Returns:
@@ -119,7 +129,7 @@ class QdrantVectorStore:
             print(f"Error searching vectors: {e}")
             return []
     
-    def delete_vectors(self, ids: List[int]) -> bool:
+    def delete(self, ids: List[int]) -> bool:
         """Delete vectors by IDs.
         
         Args:
@@ -142,10 +152,10 @@ class QdrantVectorStore:
             return False
     
     def get_collection_info(self) -> Dict[str, Any]:
-        """Get information about the collection.
+        """Get collection metadata and statistics.
         
         Returns:
-            Dictionary with collection stats
+            Collection information dictionary
         """
         if self.client is None:
             return {"error": "Qdrant client not available"}
