@@ -1,0 +1,34 @@
+# Ingestion & Processing
+kafka-python
+pyspark
+
+# NLP & Extraction
+spacy
+transformers
+sentence-transformers
+flair
+
+# Database Clients
+pymilvus
+neo4j
+qdrant-client
+
+# API
+fastapi
+uvicorn[standard]
+
+# LLM & RAG Frameworks
+langchain
+langchain-community
+llama-index
+ollama
+
+# Utilities
+python-dotenv
+requests
+pydantic
+
+# Dev / CI
+pytest
+black
+flake8
