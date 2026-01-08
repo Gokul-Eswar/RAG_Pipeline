@@ -27,6 +27,10 @@ class Config:
     API_HOST = os.getenv("API_HOST", "0.0.0.0")
     API_PORT = int(os.getenv("API_PORT", "8000"))
     
+    # Spark
+    SPARK_MASTER = os.getenv("SPARK_MASTER", "spark://spark:7077")
+    SPARK_APP_NAME = os.getenv("SPARK_APP_NAME", "BigDataRAG-Transformer")
+    
     # Security
     SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-in-production")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
