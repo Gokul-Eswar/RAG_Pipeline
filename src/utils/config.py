@@ -27,6 +27,12 @@ class Config:
     API_HOST = os.getenv("API_HOST", "0.0.0.0")
     API_PORT = int(os.getenv("API_PORT", "8000"))
     
+    # Security
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-in-production")
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    API_KEYS = os.getenv("API_KEYS", "").split(",") if os.getenv("API_KEYS") else []
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:3000").split(",")
+
     @classmethod
     def get(cls, key: str, default: Optional[str] = None) -> str:
         """Get a configuration value.
