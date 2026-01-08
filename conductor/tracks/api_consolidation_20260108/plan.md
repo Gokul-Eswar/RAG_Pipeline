@@ -1,0 +1,15 @@
+# Plan: Consolidate API and Verify Hybrid Retrieval
+
+## Phase 1: API Consolidation
+- [ ] Task: Analyze current API usage in `api/` and `src/api/` to identify overlap and conflicts.
+- [ ] Task: Migrate unique logic from `api/` to `src/api/` following the established `src/` structure.
+- [ ] Task: Update project configuration and run scripts (e.g., `run.py`, `Dockerfile`) to point to `src/api/main:app`.
+- [ ] Task: Remove the redundant `api/` directory.
+- [ ] Task: Conductor - User Manual Verification 'API Consolidation' (Protocol in workflow.md)
+
+## Phase 2: Hybrid Retrieval Integration Testing
+- [ ] Task: Write TDD integration tests for the unified API retrieval endpoints.
+- [ ] Task: Implement a 'Hybrid Health Check' endpoint that verifies connectivity to both Qdrant and Neo4j.
+- [ ] Task: Implement the core hybrid retrieval logic (if not already fully functional) ensuring it queries both databases.
+- [ ] Task: Verify >80% coverage for the new integration test suite.
+- [ ] Task: Conductor - User Manual Verification 'Hybrid Retrieval' (Protocol in workflow.md)

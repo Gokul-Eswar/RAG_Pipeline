@@ -1,0 +1,8 @@
+{
+  "track_id": "api_consolidation_20260108",
+  "type": "refactor",
+  "status": "new",
+  "created_at": "2026-01-08T20:20:00Z",
+  "updated_at": "2026-01-08T20:20:00Z",
+  "description": "Consolidate the split API structure and implement integration tests for hybrid retrieval (Vector + Graph)."
+}
