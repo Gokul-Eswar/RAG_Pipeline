@@ -1,7 +1,7 @@
 # Plan: Consolidate API and Verify Hybrid Retrieval
 
 ## Phase 1: API Consolidation
-- [ ] Task: Analyze current API usage in `api/` and `src/api/` to identify overlap and conflicts.
+- [~] Task: Analyze current API usage in `api/` and `src/api/` to identify overlap and conflicts.
 - [ ] Task: Migrate unique logic from `api/` to `src/api/` following the established `src/` structure.
 - [ ] Task: Update project configuration and run scripts (e.g., `run.py`, `Dockerfile`) to point to `src/api/main:app`.
 - [ ] Task: Remove the redundant `api/` directory.
