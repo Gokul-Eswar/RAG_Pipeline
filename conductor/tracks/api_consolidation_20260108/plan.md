@@ -1,11 +1,11 @@
 # Plan: Consolidate API and Verify Hybrid Retrieval
 
-## Phase 1: API Consolidation
+## Phase 1: API Consolidation [checkpoint: c3a64e2]
 - [x] Task: Analyze current API usage in `api/` and `src/api/` to identify overlap and conflicts. dfc9333
 - [x] Task: Migrate unique logic from `api/` to `src/api/` following the established `src/` structure. dfc9333
 - [x] Task: Update project configuration and run scripts (e.g., `run.py`, `Dockerfile`) to point to `src/api/main:app`. dfc9333
 - [x] Task: Remove the redundant `api/` directory. dfc9333
-- [ ] Task: Conductor - User Manual Verification 'API Consolidation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'API Consolidation' (Protocol in workflow.md) c3a64e2
 
 ## Phase 2: Hybrid Retrieval Integration Testing
 - [ ] Task: Write TDD integration tests for the unified API retrieval endpoints.
