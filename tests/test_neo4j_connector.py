@@ -1,17 +1,16 @@
 """Unit tests for Neo4j connector."""
 
 import pytest
-from api.connectors.neo4j_client import Neo4jClient
+from src.infrastructure.database.neo4j import Neo4jGraphRepository
 
 
-class TestNeo4jClient:
+class TestNeo4jGraphRepository:
     """Tests for Neo4j client operations."""
-    
+
     @pytest.fixture
     def client(self):
         """Create a Neo4j client instance."""
-        return Neo4jClient()
-    
+        return Neo4jGraphRepository()
     def test_client_initialization(self, client):
         """Test client can be initialized."""
         assert client is not None
@@ -55,7 +54,7 @@ class TestNeo4jNodeOperations:
     
     @pytest.fixture
     def client(self):
-        return Neo4jClient()
+        return Neo4jGraphRepository()
     
     def test_create_multiple_nodes(self, client):
         """Test creating multiple nodes."""
@@ -83,7 +82,7 @@ class TestNeo4jConnectionHandling:
     
     def test_client_close(self):
         """Test client close doesn't raise exception."""
-        client = Neo4jClient()
+        client = Neo4jGraphRepository()
         try:
             client.close()
         except Exception as e:
@@ -91,7 +90,7 @@ class TestNeo4jConnectionHandling:
     
     def test_driver_unavailable_handling(self):
         """Test graceful handling when driver is unavailable."""
-        client = Neo4jClient()
+        client = Neo4jGraphRepository()
         if client.driver is None:
             # Verify operations return graceful errors
             result = client.create_node("Test", {})
