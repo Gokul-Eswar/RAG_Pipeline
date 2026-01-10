@@ -1,9 +1,11 @@
 """Neo4j graph database repository."""
 
 import os
+import time
 from typing import Optional, Dict, Any
 from src.utils.config import Config
 from src.utils.resilience import get_retry_decorator, get_circuit_breaker
+from src.utils.metrics import DB_OPERATION_LATENCY
 from neo4j.exceptions import ServiceUnavailable, TransientError
 
 try:
@@ -54,6 +56,7 @@ class Neo4jGraphRepository:
         if self.driver is None:
             return {"error": "Neo4j driver not available"}
         
+        start_time = time.time()
         try:
             with self.driver.session() as session:
                 props_str = ", ".join([f"{k}: ${k}" for k in properties.keys()])
@@ -68,6 +71,8 @@ class Neo4jGraphRepository:
             if isinstance(e, (ServiceUnavailable, TransientError)):
                 raise
             return {"error": str(e)}
+        finally:
+            DB_OPERATION_LATENCY.labels(database="neo4j", operation="create_node").observe(time.time() - start_time)
     
     @get_circuit_breaker(name="neo4j_create_relationship")
     @get_retry_decorator(exceptions=(ServiceUnavailable, TransientError))

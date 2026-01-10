@@ -166,6 +166,18 @@ docs/
 | Scattered in files | `src/utils/config.py` | Centralized configuration |
 | No logging setup | `src/utils/logging.py` | Proper logging infrastructure |
 
+### 9. **Security & Resilience** (New)
+| Feature | Implementation | Benefit |
+|---------|----------------|---------|
+| **Authentication** | JWT (OAuth2) + API Keys | Secure access for users & services |
+| **Protection** | Rate Limiting + CORS | Prevent abuse & enable safe cross-origin requests |
+| **Secrets** | Enforced validation | Prevents startup with insecure/missing credentials |
+| **Retries** | `tenacity` decorators | Automatic recovery from transient failures (Exponential Backoff) |
+| **Circuit Breakers** | `circuitbreaker` pattern | Fail fast and prevent cascading failures |
+| **Timeouts** | Explicit configuration | Prevent hanging operations (Neo4j, Qdrant, Kafka) |
+| **Error Handling** | Global Exception Handler | Consistent JSON error responses & status codes |
+| **Observability** | JSON Logging + Metrics | Full visibility into system health, request tracing, and performance |
+
 ---
 
 ## 📋 Naming Conventions Applied

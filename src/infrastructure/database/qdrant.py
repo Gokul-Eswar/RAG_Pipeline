@@ -1,9 +1,11 @@
 """Qdrant vector database repository."""
 
 import os
+import time
 from typing import Optional, Dict, Any, List
 from src.utils.config import Config
 from src.utils.resilience import get_retry_decorator, get_circuit_breaker
+from src.utils.metrics import DB_OPERATION_LATENCY
 
 try:
     from qdrant_client import QdrantClient
@@ -86,6 +88,7 @@ class QdrantVectorRepository:
         if self.client is None:
             return {"error": "Qdrant client not available"}
         
+        start_time = time.time()
         try:
             points = []
             for item in vectors:
@@ -103,7 +106,9 @@ class QdrantVectorRepository:
             return {"status": "ok", "count": len(vectors)}
         except Exception as e:
             # Re-raise for retry logic unless it's a structural error
-            raise e 
+            raise e
+        finally:
+            DB_OPERATION_LATENCY.labels(database="qdrant", operation="upsert").observe(time.time() - start_time)
     
     @get_circuit_breaker(name="qdrant_search")
     @get_retry_decorator()
@@ -120,6 +125,7 @@ class QdrantVectorRepository:
         if self.client is None:
             return []
         
+        start_time = time.time()
         try:
             results = self.client.search(
                 collection_name=self.collection_name,
@@ -138,6 +144,8 @@ class QdrantVectorRepository:
             print(f"Error searching vectors: {e}")
             # Re-raise for retry logic
             raise e
+        finally:
+            DB_OPERATION_LATENCY.labels(database="qdrant", operation="search").observe(time.time() - start_time)
     
     def delete(self, ids: List[int]) -> bool:
         """Delete vectors by IDs.

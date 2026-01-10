@@ -4,6 +4,11 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [x] Track: Observability & Monitoring (Phase 4)
+*Link: [./conductor/tracks/observability_20260110/](./conductor/tracks/observability_20260110/)*
+
+---
+
 ## [x] Track: Error Handling & Resilience (Phase 3)
 *Link: [./conductor/tracks/error_handling_20260110/](./conductor/tracks/error_handling_20260110/)*
 
