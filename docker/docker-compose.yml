@@ -66,22 +66,72 @@ services:
       - qdrant
       - neo4j
       - redpanda
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
 
-  # Spark (optional worker for processing)
-  spark:
-    image: bitnami/spark:latest
+  # Spark Master for distributed processing
+  spark-master:
+    image: bitnami/spark:3.5.0
     environment:
       - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
     ports:
+      - "7077:7077"
       - "8081:8081"
+    volumes:
+      - spark_data:/opt/spark-apps
+
+  # Spark Worker 1 for distributed processing
+  spark-worker-1:
+    image: bitnami/spark:3.5.0
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8082:8081"
+    volumes:
+      - spark_data:/opt/spark-apps
+
+  # Spark Worker 2 for distributed processing (optional, can remove if not needed)
+  spark-worker-2:
+    image: bitnami/spark:3.5.0
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8083:8081"
+    volumes:
+      - spark_data:/opt/spark-apps
 
 volumes:
   redpanda_data:
   qdrant_data:
   neo4j_data:
   pgdata:
+  spark_data:
 
 # Notes:
-# - This compose file provides a developer-friendly stack. Some images (Airflow, Spark)
-#   may require additional configuration for production usage.
-# - Replace the `api` build with your production image or extend the Dockerfile.
+# - This compose file provides a developer-friendly stack with Spark cluster for distributed processing
+# - Spark Master: spark://spark-master:7077 (Web UI: http://localhost:8081)
+# - Spark Worker 1: http://localhost:8082
+# - Spark Worker 2: http://localhost:8083
+# - Some images (Airflow, Spark) may require additional configuration for production usage
+# - Replace the `api` build with your production image or extend the Dockerfile
+# - To disable spark-worker-2 for lighter environments, comment out the service definition
