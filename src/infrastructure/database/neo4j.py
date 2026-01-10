@@ -137,6 +137,53 @@ class Neo4jGraphRepository:
         except Exception:
             return False
     
+    def query_related_nodes(self, keywords: list[str], limit: int = 5) -> list[dict[str, Any]]:
+        """Search for nodes matching keywords and their immediate neighbors.
+        
+        Args:
+            keywords: List of strings to search for in node properties
+            limit: Maximum number of primary nodes to find
+            
+        Returns:
+            List of dictionaries containing node and relationship data
+        """
+        if self.driver is None or not keywords:
+            return []
+        
+        try:
+            with self.driver.session() as session:
+                # Basic full-text/contains search across all labels and common properties
+                # In a production system, you'd use a Full-Text Index
+                query = """
+                UNWIND $keywords AS keyword
+                MATCH (n)
+                WHERE any(prop IN keys(n) WHERE n[prop] CONTAINS keyword)
+                WITH n LIMIT $limit
+                MATCH (n)-[r]-(m)
+                RETURN 
+                    id(n) AS source_id, 
+                    labels(n) AS source_labels, 
+                    properties(n) AS source_props,
+                    type(r) AS rel_type,
+                    id(m) AS target_id,
+                    labels(m) AS target_labels,
+                    properties(m) AS target_props
+                LIMIT 20
+                """
+                result = session.run(query, keywords=keywords, limit=limit)
+                
+                context = []
+                for record in result:
+                    context.append({
+                        "source": {"id": record["source_id"], "labels": record["source_labels"], "props": record["source_props"]},
+                        "relationship": record["rel_type"],
+                        "target": {"id": record["target_id"], "labels": record["target_labels"], "props": record["target_props"]}
+                    })
+                return context
+        except Exception as e:
+            print(f"Neo4j query error: {e}")
+            return []
+
     def check_connectivity(self) -> bool:
         """Check if Neo4j is connected.
         
