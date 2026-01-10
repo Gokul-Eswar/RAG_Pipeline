@@ -4,5 +4,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [ ] Track: Enterprise Security Integration (Phase 2)
+*Link: [./conductor/tracks/enterprise_security_20260110/](./conductor/tracks/enterprise_security_20260110/)*
+
+---
+
 ## [x] Track: Consolidate API and Verify Hybrid Retrieval
 *Link: [./conductor/tracks/api_consolidation_20260108/](./conductor/tracks/api_consolidation_20260108/)*
