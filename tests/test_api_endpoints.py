@@ -26,6 +26,15 @@ class TestHealthEndpoints:
         data = response.json()
         assert data["status"] == "ok"
     
+    def test_hybrid_health(self, client):
+        response = client.get("/health/hybrid")
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert "components" in data
+        assert "neo4j" in data["components"]
+        assert "qdrant" in data["components"]
+
     def test_graph_health(self, client):
         response = client.get("/graph/health")
         assert response.status_code == 200

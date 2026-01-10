@@ -151,6 +151,22 @@ class QdrantVectorRepository:
             print(f"Error deleting vectors: {e}")
             return False
     
+    def check_connectivity(self) -> bool:
+        """Check if Qdrant is connected.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        if self.client is None:
+            return False
+        
+        try:
+            # Simple check by getting collections list
+            self.client.get_collections()
+            return True
+        except Exception:
+            return False
+
     def get_collection_info(self) -> Dict[str, Any]:
         """Get collection metadata and statistics.
         

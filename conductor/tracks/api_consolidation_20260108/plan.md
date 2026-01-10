@@ -9,7 +9,7 @@
 
 ## Phase 2: Hybrid Retrieval Integration Testing
 - [x] Task: Write TDD integration tests for the unified API retrieval endpoints. bd4e8a7
-- [~] Task: Implement a 'Hybrid Health Check' endpoint that verifies connectivity to both Qdrant and Neo4j.
-- [ ] Task: Implement the core hybrid retrieval logic (if not already fully functional) ensuring it queries both databases.
+- [x] Task: Implement a 'Hybrid Health Check' endpoint that verifies connectivity to both Qdrant and Neo4j.
+- [~] Task: Implement the core hybrid retrieval logic (if not already fully functional) ensuring it queries both databases.
 - [ ] Task: Verify >80% coverage for the new integration test suite.
 - [ ] Task: Conductor - User Manual Verification 'Hybrid Retrieval' (Protocol in workflow.md)

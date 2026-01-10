@@ -3,6 +3,8 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from src.api.handlers import events_router, vectors_router, graphs_router
+from src.infrastructure.database.neo4j import Neo4jGraphRepository
+from src.infrastructure.database.qdrant import QdrantVectorRepository
 
 
 def create_app() -> FastAPI:
@@ -23,6 +25,27 @@ def create_app() -> FastAPI:
     def health_check():
         """Health check - verifies API is running."""
         return {"status": "ok", "service": "Big Data RAG API"}
+
+    @app.get("/health/hybrid", tags=["System"])
+    def hybrid_health_check():
+        """Hybrid health check - verifies connectivity to both Qdrant and Neo4j."""
+        neo4j_repo = Neo4jGraphRepository()
+        qdrant_repo = QdrantVectorRepository()
+        
+        neo4j_status = neo4j_repo.check_connectivity()
+        qdrant_status = qdrant_repo.check_connectivity()
+        
+        neo4j_repo.close()
+        
+        status = "ok" if neo4j_status and qdrant_status else "degraded"
+        
+        return {
+            "status": status,
+            "components": {
+                "neo4j": "connected" if neo4j_status else "disconnected",
+                "qdrant": "connected" if qdrant_status else "disconnected"
+            }
+        }
 
     @app.get("/", tags=["System"])
     def root_endpoint():

@@ -137,6 +137,22 @@ class Neo4jGraphRepository:
         except Exception:
             return False
     
+    def check_connectivity(self) -> bool:
+        """Check if Neo4j is connected.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        if self.driver is None:
+            return False
+        
+        try:
+            with self.driver.session() as session:
+                result = session.run("RETURN 1")
+                return result.single()[0] == 1
+        except Exception:
+            return False
+
     def close(self):
         """Close the Neo4j driver connection."""
         if self.driver:
