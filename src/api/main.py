@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from src.api.handlers import events_router, vectors_router, graphs_router
+from src.api.handlers import events_router, vectors_router, graphs_router, hybrid_router
 from src.infrastructure.database.neo4j import Neo4jGraphRepository
 from src.infrastructure.database.qdrant import QdrantVectorRepository
 
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router)
     app.include_router(vectors_router)
     app.include_router(graphs_router)
+    app.include_router(hybrid_router)
 
     # Configure OpenAPI
     app.openapi = lambda: _custom_openapi(app)
