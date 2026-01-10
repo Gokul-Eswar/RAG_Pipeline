@@ -5,6 +5,8 @@ import os
 from typing import Dict, Any, Optional
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
+from src.utils.config import Config
+from src.utils.resilience import get_retry_decorator, get_circuit_breaker
 
 
 class EventProducer:
@@ -17,13 +19,15 @@ class EventProducer:
             broker: Kafka broker address (default from env: KAFKA_BROKER)
             topic: Target topic name (default from env: KAFKA_TOPIC_INGESTION)
         """
-        self.broker = broker or os.getenv("KAFKA_BROKER", "redpanda:9092")
-        self.topic = topic or os.getenv("KAFKA_TOPIC_INGESTION", "raw_events")
+        self.broker = broker or Config.KAFKA_BROKER
+        self.topic = topic or Config.KAFKA_TOPIC
         self.producer = KafkaProducer(
             bootstrap_servers=self.broker,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
     
+    @get_circuit_breaker(name="kafka_publish")
+    @get_retry_decorator(exceptions=(KafkaError,))
     def publish_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Publish an event to the Kafka topic.
         
@@ -37,7 +41,7 @@ class EventProducer:
         """
         try:
             future = self.producer.send(self.topic, value=event)
-            record_metadata = future.get(timeout=10)
+            record_metadata = future.get(timeout=Config.KAFKA_TIMEOUT)
             
             return {
                 "topic": record_metadata.topic,
@@ -45,8 +49,11 @@ class EventProducer:
                 "offset": record_metadata.offset,
             }
         except KafkaError as e:
+            # Let retry handle it
+            raise e
+        except Exception as e:
             print(f"Error publishing event: {e}")
-            return None
+            raise e
     
     def publish_batch(self, events: list) -> Dict[str, Any]:
         """Publish multiple events to Kafka.
@@ -61,10 +68,11 @@ class EventProducer:
         failed = 0
         
         for event in events:
-            result = self.publish_event(event)
-            if result:
-                successful += 1
-            else:
+            try:
+                result = self.publish_event(event)
+                if result:
+                    successful += 1
+            except Exception:
                 failed += 1
         
         return {
@@ -89,12 +97,15 @@ def publish_event(event_id: str, text: str, metadata: Optional[Dict] = None) -> 
     Returns:
         True if successful, False otherwise
     """
-    producer = EventProducer()
-    event = {
-        "id": event_id,
-        "text": text,
-        "metadata": metadata or {},
-    }
-    result = producer.publish_event(event)
-    producer.close()
-    return result is not None
+    try:
+        producer = EventProducer()
+        event = {
+            "id": event_id,
+            "text": text,
+            "metadata": metadata or {},
+        }
+        result = producer.publish_event(event)
+        producer.close()
+        return result is not None
+    except Exception:
+        return False

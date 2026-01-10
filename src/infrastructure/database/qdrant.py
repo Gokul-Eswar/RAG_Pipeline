@@ -2,6 +2,8 @@
 
 import os
 from typing import Optional, Dict, Any, List
+from src.utils.config import Config
+from src.utils.resilience import get_retry_decorator, get_circuit_breaker
 
 try:
     from qdrant_client import QdrantClient
@@ -27,16 +29,18 @@ class QdrantVectorRepository:
             collection_name: Name of vector collection (default from env)
         """
         self.client = self._get_client()
-        self.collection_name = collection_name or os.getenv("QDRANT_COLLECTION_DEFAULT", "documents")
+        self.collection_name = collection_name or Config.QDRANT_COLLECTION
     
     @staticmethod
     def _get_client() -> Optional[QdrantClient]:
         """Get Qdrant client instance."""
         if QdrantClient is None:
             return None
-        host = os.getenv("QDRANT_HOST", "qdrant")
-        port = int(os.getenv("QDRANT_PORT", "6333"))
-        return QdrantClient(url=f"http://{host}:{port}")
+        host = Config.QDRANT_HOST
+        port = Config.QDRANT_PORT
+        # Qdrant client handles timeouts differently, often passed in methods
+        # but we can set a global timeout if the client supports it
+        return QdrantClient(url=f"http://{host}:{port}", timeout=Config.QDRANT_TIMEOUT)
     
     def create_collection(self, vector_size: int = 384, distance_metric: str = "cosine") -> bool:
         """Create a new vector collection.
@@ -68,6 +72,8 @@ class QdrantVectorRepository:
             print(f"Error creating collection: {e}")
             return False
     
+    @get_circuit_breaker(name="qdrant_upsert")
+    @get_retry_decorator()
     def upsert(self, vectors: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Insert or update vectors in the collection.
         
@@ -96,8 +102,11 @@ class QdrantVectorRepository:
             )
             return {"status": "ok", "count": len(vectors)}
         except Exception as e:
-            return {"error": str(e)}
+            # Re-raise for retry logic unless it's a structural error
+            raise e 
     
+    @get_circuit_breaker(name="qdrant_search")
+    @get_retry_decorator()
     def search(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
         """Search for similar vectors.
         
@@ -127,7 +136,8 @@ class QdrantVectorRepository:
             ]
         except Exception as e:
             print(f"Error searching vectors: {e}")
-            return []
+            # Re-raise for retry logic
+            raise e
     
     def delete(self, ids: List[int]) -> bool:
         """Delete vectors by IDs.
@@ -167,6 +177,8 @@ class QdrantVectorRepository:
         except Exception:
             return False
 
+    @get_circuit_breaker(name="qdrant_info")
+    @get_retry_decorator()
     def get_collection_info(self) -> Dict[str, Any]:
         """Get collection metadata and statistics.
         
@@ -185,4 +197,5 @@ class QdrantVectorRepository:
                 "config": str(info.config) if hasattr(info, "config") else "N/A",
             }
         except Exception as e:
-            return {"error": str(e)}
+             # Re-raise for retry logic
+            raise e

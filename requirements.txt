@@ -21,6 +21,15 @@ passlib[bcrypt]
 python-multipart
 slowapi
 
+# Resilience & Monitoring
+tenacity
+circuitbreaker
+python-json-logger
+prometheus-client
+
+# Caching
+redis
+
 # LLM & RAG Frameworks
 langchain
 langchain-community

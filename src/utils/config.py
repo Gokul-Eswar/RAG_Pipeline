@@ -37,6 +37,16 @@ class Config:
     API_KEYS = os.getenv("API_KEYS", "").split(",") if os.getenv("API_KEYS") else []
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:3000").split(",")
 
+    # Resilience
+    RETRY_MAX_ATTEMPTS = int(os.getenv("RETRY_MAX_ATTEMPTS", "3"))
+    RETRY_MIN_WAIT = float(os.getenv("RETRY_MIN_WAIT", "1.0"))
+    RETRY_MAX_WAIT = float(os.getenv("RETRY_MAX_WAIT", "10.0"))
+    
+    # Timeouts (seconds)
+    NEO4J_TIMEOUT = int(os.getenv("NEO4J_TIMEOUT", "5"))
+    QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", "10"))
+    KAFKA_TIMEOUT = int(os.getenv("KAFKA_TIMEOUT", "3"))
+
     @classmethod
     def get(cls, key: str, default: Optional[str] = None) -> str:
         """Get a configuration value.

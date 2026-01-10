@@ -3,6 +3,8 @@
 import os
 from typing import Optional, Dict, Any
 from src.utils.config import Config
+from src.utils.resilience import get_retry_decorator, get_circuit_breaker
+from neo4j.exceptions import ServiceUnavailable, TransientError
 
 try:
     from neo4j import GraphDatabase
@@ -31,8 +33,14 @@ class Neo4jGraphRepository:
         auth = auth_str.split("/")
         user = auth[0]
         password = auth[1] if len(auth) > 1 else ""
-        return GraphDatabase.driver(uri, auth=(user, password))
+        return GraphDatabase.driver(
+            uri, 
+            auth=(user, password),
+            connection_timeout=Config.NEO4J_TIMEOUT
+        )
     
+    @get_circuit_breaker(name="neo4j_create_node")
+    @get_retry_decorator(exceptions=(ServiceUnavailable, TransientError))
     def create_node(self, label: str, properties: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new node in the graph.
         
@@ -56,8 +64,13 @@ class Neo4jGraphRepository:
                     return {"node_id": record["node_id"], "properties": record["props"]}
                 return {"error": "Failed to create node"}
         except Exception as e:
+            # Let retry/circuit breaker handle connectivity issues
+            if isinstance(e, (ServiceUnavailable, TransientError)):
+                raise
             return {"error": str(e)}
     
+    @get_circuit_breaker(name="neo4j_create_relationship")
+    @get_retry_decorator(exceptions=(ServiceUnavailable, TransientError))
     def create_relationship(
         self,
         from_id: int,
@@ -92,8 +105,12 @@ class Neo4jGraphRepository:
                     return {"relationship_id": record["rel_id"], "type": rel_type}
                 return {"error": "Failed to create relationship"}
         except Exception as e:
+            if isinstance(e, (ServiceUnavailable, TransientError)):
+                raise
             return {"error": str(e)}
     
+    @get_circuit_breaker(name="neo4j_find_node")
+    @get_retry_decorator(exceptions=(ServiceUnavailable, TransientError))
     def find_node(self, label: str, properties: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Find a node matching given criteria.
         
@@ -116,7 +133,9 @@ class Neo4jGraphRepository:
                 if record:
                     return {"node_id": record["node_id"], "properties": record["props"]}
                 return None
-        except Exception:
+        except Exception as e:
+            if isinstance(e, (ServiceUnavailable, TransientError)):
+                raise
             return None
     
     def delete_node(self, node_id: int) -> bool:

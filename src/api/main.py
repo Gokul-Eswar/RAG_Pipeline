@@ -14,6 +14,17 @@ from src.infrastructure.database.qdrant import QdrantVectorRepository
 from src.utils.config import Config
 
 
+from src.api.middleware.error_handlers import (
+    validation_exception_handler,
+    app_exception_handler,
+    circuit_breaker_handler,
+    global_exception_handler
+)
+from src.utils.exceptions import AppError
+from circuitbreaker import CircuitBreakerError
+from fastapi.exceptions import RequestValidationError
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application.
     
@@ -33,6 +44,12 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
+    
+    # Exception Handlers
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(AppError, app_exception_handler)
+    app.add_exception_handler(CircuitBreakerError, circuit_breaker_handler)
+    app.add_exception_handler(Exception, global_exception_handler)
 
     # Configure CORS
     app.add_middleware(
