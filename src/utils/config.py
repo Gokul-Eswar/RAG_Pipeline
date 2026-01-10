@@ -32,7 +32,7 @@ class Config:
     SPARK_APP_NAME = os.getenv("SPARK_APP_NAME", "BigDataRAG-Transformer")
     
     # Security
-    SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-in-production")
+    SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-default-key-for-dev-only")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     API_KEYS = os.getenv("API_KEYS", "").split(",") if os.getenv("API_KEYS") else []
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:3000").split(",")
@@ -49,3 +49,12 @@ class Config:
             Configuration value
         """
         return getattr(cls, key, default)
+
+    @classmethod
+    def validate(cls):
+        """Validate critical configuration."""
+        if not cls.DEBUG and cls.SECRET_KEY == "unsafe-default-key-for-dev-only":
+            raise ValueError("SECRET_KEY must be set in production environment")
+        
+        if not cls.NEO4J_AUTH:
+            raise ValueError("NEO4J_AUTH environment variable is required")

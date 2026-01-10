@@ -2,6 +2,7 @@
 
 import os
 from typing import Optional, Dict, Any
+from src.utils.config import Config
 
 try:
     from neo4j import GraphDatabase
@@ -25,11 +26,11 @@ class Neo4jGraphRepository:
         """Get or create Neo4j driver instance."""
         if GraphDatabase is None:
             return None
-        uri = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
-        auth_str = os.getenv("NEO4J_AUTH", "neo4j/test")
+        uri = Config.NEO4J_URI
+        auth_str = Config.NEO4J_AUTH
         auth = auth_str.split("/")
         user = auth[0]
-        password = auth[1] if len(auth) > 1 else "test"
+        password = auth[1] if len(auth) > 1 else ""
         return GraphDatabase.driver(uri, auth=(user, password))
     
     def create_node(self, label: str, properties: Dict[str, Any]) -> Dict[str, Any]:

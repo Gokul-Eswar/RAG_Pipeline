@@ -1,10 +1,11 @@
 """Event ingestion API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import os
 import json
 from typing import Optional
+from src.api.security import get_current_active_user
 
 try:
     from kafka import KafkaProducer
@@ -43,7 +44,10 @@ def check_ingestion_health():
 
 
 @router.post("/", description="Publish event to streaming platform")
-def ingest_event(request: IngestEventRequest):
+def ingest_event(
+    request: IngestEventRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Publish a single event to the streaming platform (Kafka/Redpanda).
     
     The event will be published to the configured Kafka topic for processing.

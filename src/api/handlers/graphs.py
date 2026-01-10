@@ -1,9 +1,10 @@
 """Graph database API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import os
 from src.infrastructure.database.neo4j import Neo4jGraphRepository
+from src.api.security import get_current_active_user
 
 router = APIRouter(prefix="/graph", tags=["Memory - Graph"])
 
@@ -36,7 +37,10 @@ def check_graph_health():
 
 
 @router.post("/node", description="Create a node in the graph")
-def create_graph_node(request: NodeCreateRequest):
+def create_graph_node(
+    request: NodeCreateRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Create a new node in the graph database."""
     if not request.label:
         raise HTTPException(status_code=400, detail="label required")
@@ -55,7 +59,10 @@ def create_graph_node(request: NodeCreateRequest):
 
 
 @router.post("/relationship", description="Create a relationship between nodes")
-def create_graph_relationship(request: RelationshipCreateRequest):
+def create_graph_relationship(
+    request: RelationshipCreateRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Create a relationship between two nodes."""
     if not request.relationship_type:
         raise HTTPException(status_code=400, detail="relationship_type required")
@@ -97,7 +104,10 @@ def find_graph_node(request: NodeQueryRequest):
 
 
 @router.delete("/node/{node_id}", description="Delete a node by ID")
-def delete_graph_node(node_id: int):
+def delete_graph_node(
+    node_id: int,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Delete a node from the graph by ID."""
     try:
         repository = Neo4jGraphRepository()

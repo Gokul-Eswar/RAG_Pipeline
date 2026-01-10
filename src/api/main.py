@@ -1,10 +1,17 @@
 """FastAPI application factory."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from src.api.handlers import events_router, vectors_router, graphs_router, hybrid_router
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+from src.api.handlers import auth_router, events_router, vectors_router, graphs_router, hybrid_router
 from src.infrastructure.database.neo4j import Neo4jGraphRepository
 from src.infrastructure.database.qdrant import QdrantVectorRepository
+from src.utils.config import Config
 
 
 def create_app() -> FastAPI:
@@ -19,6 +26,21 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
+    )
+
+    # Initialize Rate Limiter
+    limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
+
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=Config.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.get("/health", tags=["System"])
@@ -58,6 +80,7 @@ def create_app() -> FastAPI:
         }
 
     # Include routers
+    app.include_router(auth_router)
     app.include_router(events_router)
     app.include_router(vectors_router)
     app.include_router(graphs_router)

@@ -1,9 +1,10 @@
 """Vector memory (semantic search) API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import os
 from src.infrastructure.database.qdrant import QdrantVectorRepository
+from src.api.security import get_current_active_user
 
 router = APIRouter(prefix="/memory", tags=["Memory - Vectors"])
 
@@ -35,7 +36,10 @@ def check_vector_memory_health():
 
 
 @router.post("/upsert", description="Upsert vectors into vector store")
-def upsert_vectors(request: UpsertVectorsRequest):
+def upsert_vectors(
+    request: UpsertVectorsRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Upsert vectors into the vector database.
     
     Expected vector format:
