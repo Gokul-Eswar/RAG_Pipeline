@@ -18,8 +18,9 @@ class TestHybridRetrieval:
         # This is expected to fail with 404 until implemented
         assert response.status_code == 200
         data = response.json()
-        assert "neo4j" in data
-        assert "qdrant" in data
+        assert "components" in data
+        assert "neo4j" in data["components"]
+        assert "qdrant" in data["components"]
 
     def test_hybrid_search_endpoint_exists(self, client):
         """Verify the hybrid search endpoint exists."""
