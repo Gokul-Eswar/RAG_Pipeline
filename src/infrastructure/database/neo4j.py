@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 from src.utils.config import Config
 from src.utils.resilience import get_retry_decorator, get_circuit_breaker
 from src.utils.metrics import DB_OPERATION_LATENCY
+from src.infrastructure.cache.redis import cache_result
 from neo4j.exceptions import ServiceUnavailable, TransientError
 
 try:
@@ -123,6 +124,7 @@ class Neo4jGraphRepository:
                 return {"error": f"Query timeout after {timeout}s"}
             return {"error": str(e)}
     
+    @cache_result(ttl=3600)
     @get_circuit_breaker(name="neo4j_find_node")
     @get_retry_decorator(exceptions=(ServiceUnavailable, TransientError))
     def find_node(self, label: str, properties: Dict[str, Any], timeout: int = 5) -> Optional[Dict[str, Any]]:
@@ -235,6 +237,7 @@ class Neo4jGraphRepository:
         except Exception:
             return False
 
+    @cache_result(ttl=300)
     def query_with_timeout(self, query: str, params: Dict[str, Any] = None, timeout: int = 5) -> List[Dict[str, Any]]:
         """Execute a raw Cypher query with timeout.
         

@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 from src.utils.config import Config
 from src.utils.resilience import get_retry_decorator, get_circuit_breaker
 from src.utils.metrics import DB_OPERATION_LATENCY
+from src.infrastructure.cache.redis import cache_result
 
 try:
     from qdrant_client import QdrantClient
@@ -118,6 +119,7 @@ class QdrantVectorRepository:
         finally:
             DB_OPERATION_LATENCY.labels(database="qdrant", operation="upsert").observe(time.time() - start_time)
     
+    @cache_result(ttl=3600)
     @get_circuit_breaker(name="qdrant_search")
     @get_retry_decorator()
     def search(self, query_vector: List[float], limit: int = 10) -> List[Dict[str, Any]]:
@@ -193,6 +195,7 @@ class QdrantVectorRepository:
         except Exception:
             return False
 
+    @cache_result(ttl=300)
     @get_circuit_breaker(name="qdrant_info")
     @get_retry_decorator()
     def get_collection_info(self) -> Dict[str, Any]:
