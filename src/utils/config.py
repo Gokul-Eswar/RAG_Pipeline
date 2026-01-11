@@ -46,6 +46,10 @@ class Config:
     NEO4J_TIMEOUT = int(os.getenv("NEO4J_TIMEOUT", "5"))
     QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", "10"))
     KAFKA_TIMEOUT = int(os.getenv("KAFKA_TIMEOUT", "3"))
+    
+    # Neo4j Pool
+    NEO4J_MAX_POOL_SIZE = int(os.getenv("NEO4J_MAX_POOL_SIZE", "50"))
+    NEO4J_CONNECTION_ACQUISITION_TIMEOUT = float(os.getenv("NEO4J_CONNECTION_ACQUISITION_TIMEOUT", "30.0"))
 
     @classmethod
     def get(cls, key: str, default: Optional[str] = None) -> str:

@@ -76,11 +76,12 @@ class QdrantVectorRepository:
     
     @get_circuit_breaker(name="qdrant_upsert")
     @get_retry_decorator()
-    def upsert(self, vectors: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def upsert(self, vectors: List[Dict[str, Any]], batch_size: int = 100) -> Dict[str, Any]:
         """Insert or update vectors in the collection.
         
         Args:
             vectors: List of vector objects with id, vector, and optional payload
+            batch_size: Number of vectors to upsert in one request
             
         Returns:
             Status dictionary
@@ -89,21 +90,28 @@ class QdrantVectorRepository:
             return {"error": "Qdrant client not available"}
         
         start_time = time.time()
+        total_upserted = 0
+        
         try:
-            points = []
-            for item in vectors:
-                point = PointStruct(
-                    id=item["id"],
-                    vector=item["vector"],
-                    payload=item.get("payload", {}),
+            # Process in batches
+            for i in range(0, len(vectors), batch_size):
+                batch = vectors[i:i+batch_size]
+                points = []
+                for item in batch:
+                    point = PointStruct(
+                        id=item["id"],
+                        vector=item["vector"],
+                        payload=item.get("payload", {}),
+                    )
+                    points.append(point)
+                
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=points,
                 )
-                points.append(point)
-            
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points,
-            )
-            return {"status": "ok", "count": len(vectors)}
+                total_upserted += len(batch)
+                
+            return {"status": "ok", "count": total_upserted}
         except Exception as e:
             # Re-raise for retry logic unless it's a structural error
             raise e
@@ -127,11 +135,11 @@ class QdrantVectorRepository:
         
         start_time = time.time()
         try:
-            results = self.client.search(
+            results = self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_vector,
+                query=query_vector,
                 limit=limit,
-            )
+            ).points
             return [
                 {
                     "id": result.id,
