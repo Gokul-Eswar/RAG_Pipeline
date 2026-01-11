@@ -3,7 +3,7 @@
 import json
 import functools
 import hashlib
-from typing import Any, Optional, Union
+from typing import Any, Optional
 from src.utils.config import Config
 
 try:
@@ -66,7 +66,7 @@ class RedisCache:
             return True
         except Exception:
             return False
-    
+
     def delete(self, key: str) -> bool:
         """Delete value from cache."""
         if not self._client:
@@ -79,7 +79,7 @@ class RedisCache:
 
 def cache_result(ttl: int = 3600, key_prefix: str = ""):
     """Decorator to cache function results in Redis.
-    
+
     Args:
         ttl: Time to live in seconds
         key_prefix: Prefix for cache key
@@ -94,13 +94,15 @@ def cache_result(ttl: int = 3600, key_prefix: str = ""):
 
             try:
                 # Create cache key from function name and arguments
-                # For methods (args[0] is self), we might want to be careful not to include 'self' in hash
+                # For methods (args[0] is self), we might want to be careful
+                # not to include 'self' in hash
                 # simpler approach: use module + func name + args string
-                
+
                 # Exclude 'self' from args if it's a method
-                # This is a heuristic: if args[0] has 'client' or 'driver' attr, it's likely 'self' of a Repo
-                call_args = args[1:] if args and hasattr(args[0], '__class__') else args
-                
+                # This is a heuristic: if args[0] has 'client' or 'driver' attr
+                call_args = args[1:] if args and hasattr(args[0], '__class__') \
+                    else args
+
                 key_str = f"{key_prefix or func.__name__}:{str(call_args)}:{str(kwargs)}"
                 key_hash = hashlib.md5(key_str.encode()).hexdigest()
                 cache_key = f"cache:{key_prefix or func.__name__}:{key_hash}"

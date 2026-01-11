@@ -1,9 +1,9 @@
 """Locust load test file."""
 
-import json
 import random
 import os
 from locust import HttpUser, task, between
+
 
 class BigDataRAGUser(HttpUser):
     wait_time = between(1, 3)
@@ -30,15 +30,19 @@ class BigDataRAGUser(HttpUser):
             "query_text": "test query content",
             "limit": 5
         }
-        self.client.post("/memory/search/hybrid", json=query_data, headers=self.headers)
-        
+        self.client.post("/memory/search/hybrid", json=query_data,
+                         headers=self.headers)
+
     @task(2)
     def ingest_event(self):
         """Test event ingestion."""
         event_data = {
             "id": f"load_test_{random.randint(1, 100000)}",
-            "text": f"This is a load test document content {random.randint(1, 1000)}",
-            "metadata": {"source": "locust", "timestamp": "2026-01-11T12:00:00Z"}
+            "text": f"This is a load test document {random.randint(1, 1000)}",
+            "metadata": {
+                "source": "locust",
+                "timestamp": "2026-01-11T12:00:00Z"
+            }
         }
         self.client.post("/ingest/", json=event_data, headers=self.headers)
 
@@ -49,4 +53,5 @@ class BigDataRAGUser(HttpUser):
             "label": "Document",
             "properties": {"source": "locust"}
         }
-        self.client.post("/graph/node/find", json=search_data, headers=self.headers)
+        self.client.post("/graph/node/find", json=search_data,
+                         headers=self.headers)
