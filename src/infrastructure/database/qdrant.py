@@ -45,6 +45,7 @@ class QdrantVectorRepository:
         # but we can set a global timeout if the client supports it
         return QdrantClient(url=f"http://{host}:{port}", timeout=Config.QDRANT_TIMEOUT)
     
+    @get_retry_decorator()
     def create_collection(self, vector_size: int = 384, distance_metric: str = "cosine") -> bool:
         """Create a new vector collection.
         
@@ -73,7 +74,7 @@ class QdrantVectorRepository:
             return True
         except Exception as e:
             print(f"Error creating collection: {e}")
-            return False
+            raise e
     
     @get_circuit_breaker(name="qdrant_upsert")
     @get_retry_decorator()
@@ -151,12 +152,13 @@ class QdrantVectorRepository:
                 for result in results
             ]
         except Exception as e:
-            print(f"Error searching vectors: {e}")
             # Re-raise for retry logic
             raise e
         finally:
             DB_OPERATION_LATENCY.labels(database="qdrant", operation="search").observe(time.time() - start_time)
     
+    @get_circuit_breaker(name="qdrant_delete")
+    @get_retry_decorator()
     def delete(self, ids: List[int]) -> bool:
         """Delete vectors by IDs.
         
@@ -164,20 +166,19 @@ class QdrantVectorRepository:
             ids: List of vector IDs to delete
             
         Returns:
-            True if successful, False otherwise
+            True if successful
+            
+        Raises:
+            Exception: If deletion fails
         """
         if self.client is None:
             return False
         
-        try:
-            self.client.delete(
-                collection_name=self.collection_name,
-                points_selector=ids,
-            )
-            return True
-        except Exception as e:
-            print(f"Error deleting vectors: {e}")
-            return False
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=ids,
+        )
+        return True
     
     def check_connectivity(self) -> bool:
         """Check if Qdrant is connected.

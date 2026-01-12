@@ -2,7 +2,12 @@
 
 import json
 import os
+import logging
 from typing import Dict, Any, Optional
+from src.utils.resilience import get_retry_decorator, get_circuit_breaker
+from src.utils.metrics import EVENTS_INGESTED
+
+logger = logging.getLogger(__name__)
 
 try:
     from kafka import KafkaProducer
@@ -39,9 +44,11 @@ class KafkaEventProducer:
                 value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             )
         except Exception as e:
-            print(f"Failed to create Kafka producer: {e}")
+            logger.error(f"Failed to create Kafka producer: {e}")
             return None
     
+    @get_circuit_breaker(name="kafka_publish")
+    @get_retry_decorator()
     def publish(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Publish a single event.
         
@@ -49,26 +56,25 @@ class KafkaEventProducer:
             event: Event dictionary to publish
             
         Returns:
-            Kafka metadata or None if failed
+            Kafka metadata
+            
+        Raises:
+            Exception: If publishing fails (to trigger retry)
         """
         if self.producer is None:
-            return None
+            raise Exception("Kafka producer not available")
         
-        try:
-            future = self.producer.send(self.topic, value=event)
-            record_metadata = future.get(timeout=10)
-            
-            return {
-                "topic": record_metadata.topic,
-                "partition": record_metadata.partition,
-                "offset": record_metadata.offset,
-            }
-        except KafkaError as e:
-            print(f"Kafka error: {e}")
-            return None
-        except Exception as e:
-            print(f"Error publishing event: {e}")
-            return None
+        future = self.producer.send(self.topic, value=event)
+        # Wait for result to ensure it's sent (synchronous for reliability)
+        record_metadata = future.get(timeout=10)
+        
+        EVENTS_INGESTED.labels(topic=self.topic).inc()
+        
+        return {
+            "topic": record_metadata.topic,
+            "partition": record_metadata.partition,
+            "offset": record_metadata.offset,
+        }
     
     def publish_batch(self, events: list) -> Dict[str, Any]:
         """Publish multiple events.
@@ -83,10 +89,11 @@ class KafkaEventProducer:
         failed = 0
         
         for event in events:
-            result = self.publish(event)
-            if result:
+            try:
+                self.publish(event)
                 successful += 1
-            else:
+            except Exception as e:
+                logger.error(f"Failed to publish event in batch: {e}")
                 failed += 1
         
         return {
@@ -118,6 +125,14 @@ def publish_event(event_id: str, text: str, metadata: Optional[Dict] = None) -> 
         "text": text,
         "metadata": metadata or {},
     }
-    result = producer.publish(event)
-    producer.close()
-    return result is not None
+    try:
+        producer.publish(event)
+        producer.close()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to publish event {event_id}: {e}")
+        try:
+            producer.close()
+        except:
+            pass
+        return False
