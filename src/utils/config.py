@@ -75,6 +75,11 @@ class Config:
         """Validate critical configuration."""
         if not cls.DEBUG and cls.SECRET_KEY == "unsafe-default-key-for-dev-only":
             raise ValueError("SECRET_KEY must be set in production environment")
-        
+
         if not cls.NEO4J_AUTH:
             raise ValueError("NEO4J_AUTH environment variable is required")
+
+        # If running in production (not DEBUG) and Redis is used remotely,
+        # require a Redis password to avoid leaving Redis unauthenticated.
+        if not cls.DEBUG and cls.REDIS_HOST not in ("localhost", "127.0.0.1") and not cls.REDIS_PASSWORD:
+            raise ValueError("REDIS_PASSWORD must be set for remote Redis instances in production")

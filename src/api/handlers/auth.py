@@ -13,8 +13,8 @@ from src.api.security import (
     verify_password,
     UserInDB,
     get_current_active_user,
-    fake_users_db,
-    fake_api_key_db
+    get_user,
+    store_api_key,
 )
 from src.utils.config import Config
 
@@ -24,14 +24,12 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
+def _get_user_for_login(username: str):
+    return get_user(username)
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = get_user(fake_users_db, form_data.username)
+    user = _get_user_for_login(form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,18 +56,8 @@ async def generate_api_key(
     # Hash the secret
     hashed_secret = get_password_hash(key_secret)
     
-    # Store in mock DB
-    # 1. Add key ID to user's list
-    if current_user.username in fake_users_db:
-        # We need to access the mutable dict in the db
-        fake_users_db[current_user.username]["api_keys"].append(key_id)
-        
-        # 2. Add to global key lookup
-        fake_api_key_db[key_id] = {
-            "username": current_user.username,
-            "hashed_secret": hashed_secret,
-            "created_at": "now" # In real app, use datetime
-        }
+    # Persist API key in Redis-backed store
+    store_api_key(key_id, current_user.username, key_secret)
     
     return {
         "api_key": raw_key,
