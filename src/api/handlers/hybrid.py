@@ -11,6 +11,7 @@ from src.infrastructure.database.neo4j import Neo4jGraphRepository
 from src.infrastructure.database.qdrant import QdrantVectorRepository
 from src.ai.models.language_models import SentenceTransformerModel
 from src.utils.logging import get_logger
+from src.api.security import get_current_active_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/memory/search", tags=["Memory - Hybrid"])
@@ -51,7 +52,8 @@ def extract_keywords(text: str) -> List[str]:
 @router.post("/hybrid", description="Perform hybrid search (Vector + Graph)")
 def search_hybrid(
     request: HybridSearchRequest,
-    model: SentenceTransformerModel = Depends(get_embedding_model)
+    model: SentenceTransformerModel = Depends(get_embedding_model),
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Search using both vector similarity and graph relationships.
     
