@@ -69,3 +69,52 @@ class SentenceTransformerModel(LanguageModel):
         if isinstance(embedding, np.ndarray):
             return embedding.tolist()
         return embedding
+
+
+class OllamaModel(LanguageModel):
+    """LLM implementation using Ollama."""
+
+    def __init__(self, model_name: str = "llama3"):
+        """Initialize the model.
+
+        Args:
+            model_name: Name of the Ollama model to use
+        """
+        try:
+            import ollama
+            self.client = ollama.Client()
+        except ImportError:
+            raise ImportError("ollama is not installed. Run 'pip install ollama'.")
+        
+        self.model_name = model_name
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        """Generate text from a prompt.
+
+        Args:
+            prompt: Input prompt
+            **kwargs: Additional parameters (e.g., system prompt)
+
+        Returns:
+            Generated text
+        """
+        try:
+            response = self.client.generate(
+                model=self.model_name,
+                prompt=prompt,
+                **kwargs
+            )
+            return response['response']
+        except Exception as e:
+            raise RuntimeError(f"Ollama generation failed: {str(e)}")
+
+    def embed(self, text: str) -> List[float]:
+        """Generate embeddings using Ollama (optional)."""
+        try:
+            response = self.client.embeddings(
+                model=self.model_name,
+                prompt=text
+            )
+            return response['embedding']
+        except Exception as e:
+            raise RuntimeError(f"Ollama embedding failed: {str(e)}")
