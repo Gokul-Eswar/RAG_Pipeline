@@ -4,6 +4,11 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [x] Track: Deployment & Scaling (Phase 7)
+*Link: [./conductor/tracks/deployment_scaling_20260112/](./conductor/tracks/deployment_scaling_20260112/)*
+
+---
+
 ## [x] Track: Performance Optimization (Phase 6)
 *Link: [./conductor/tracks/performance_optimization_20260112/](./conductor/tracks/performance_optimization_20260112/)*
 
