@@ -4,6 +4,11 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [x] Track: Performance Optimization (Phase 6)
+*Link: [./conductor/tracks/performance_optimization_20260112/](./conductor/tracks/performance_optimization_20260112/)*
+
+---
+
 ## [x] Track: Database Resilience (Phase 5)
 *Link: [./conductor/tracks/database_resilience_20260112/](./conductor/tracks/database_resilience_20260112/)*
 

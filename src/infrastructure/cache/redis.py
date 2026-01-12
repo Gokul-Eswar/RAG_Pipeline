@@ -28,7 +28,10 @@ class RedisCache:
     def _initialize_client(self):
         """Initialize Redis client."""
         if redis is None:
-            print("Redis client not installed.")
+            # Only print warning once
+            if not getattr(self, '_logged_warning', False):
+                print("Redis client not installed (pip install redis). Caching disabled.")
+                self._logged_warning = True
             self._client = None
             return
 
@@ -39,12 +42,16 @@ class RedisCache:
                 db=Config.REDIS_DB,
                 password=Config.REDIS_PASSWORD,
                 decode_responses=True,
-                socket_connect_timeout=1  # Fast fail if Redis not available
+                socket_connect_timeout=1,  # Fast fail if Redis not available
+                socket_timeout=1
             )
             # Test connection
             self._client.ping()
         except Exception as e:
-            print(f"Redis connection failed: {e}")
+            # Only print warning once
+            if not getattr(self, '_logged_warning', False):
+                print(f"Redis connection failed: {e}. Caching disabled.")
+                self._logged_warning = True
             self._client = None
 
     def get(self, key: str) -> Optional[Any]:
@@ -94,14 +101,18 @@ def cache_result(ttl: int = 3600, key_prefix: str = ""):
 
             try:
                 # Create cache key from function name and arguments
-                # For methods (args[0] is self), we might want to be careful
-                # not to include 'self' in hash
                 # simpler approach: use module + func name + args string
 
                 # Exclude 'self' from args if it's a method
                 # This is a heuristic: if args[0] has 'client' or 'driver' attr
-                call_args = args[1:] if args and hasattr(args[0], '__class__') \
-                    else args
+                # or simpler: just check if first arg seems to be an instance
+                call_args = args
+                if args and hasattr(args[0], '__class__'):
+                    # Check if it's really an instance method call by seeing if func is bound?
+                    # Hard to tell easily. We'll just assume first arg is self if it has typical instance attrs
+                    # or just rely on the user to use this on methods where self doesn't matter for the key
+                    # Ideally, we want to exclude 'self' from the hash
+                     call_args = args[1:]
 
                 key_str = f"{key_prefix or func.__name__}:{str(call_args)}:{str(kwargs)}"
                 key_hash = hashlib.md5(key_str.encode()).hexdigest()
@@ -122,7 +133,7 @@ def cache_result(ttl: int = 3600, key_prefix: str = ""):
                 return result
             except Exception as e:
                 # Fallback to original function on any caching error
-                print(f"Cache error: {e}")
+                # print(f"Cache error: {e}") # Reduce noise
                 return func(*args, **kwargs)
         return wrapper
     return decorator

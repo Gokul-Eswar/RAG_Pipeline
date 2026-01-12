@@ -2,6 +2,7 @@
 
 import random
 import os
+import time
 from locust import HttpUser, task, between
 
 
@@ -24,13 +25,14 @@ class BigDataRAGUser(HttpUser):
         self.client.get("/health/live")
 
     @task(5)
-    def search_hybrid(self):
-        """Test hybrid search (Vector + Graph)."""
+    def search_vectors(self):
+        """Test vector search."""
         query_data = {
             "query_text": "test query content",
             "limit": 5
         }
-        self.client.post("/memory/search/hybrid", json=query_data,
+        # Based on openapi schema in main.py
+        self.client.post("/memory/search", json=query_data,
                          headers=self.headers)
 
     @task(2)
@@ -41,10 +43,10 @@ class BigDataRAGUser(HttpUser):
             "text": f"This is a load test document {random.randint(1, 1000)}",
             "metadata": {
                 "source": "locust",
-                "timestamp": "2026-01-11T12:00:00Z"
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             }
         }
-        self.client.post("/ingest/", json=event_data, headers=self.headers)
+        self.client.post("/events/ingest", json=event_data, headers=self.headers)
 
     @task(3)
     def find_node(self):
@@ -55,3 +57,8 @@ class BigDataRAGUser(HttpUser):
         }
         self.client.post("/graph/node/find", json=search_data,
                          headers=self.headers)
+    
+    @task(1)
+    def metrics(self):
+        """Test metrics endpoint."""
+        self.client.get("/metrics")
