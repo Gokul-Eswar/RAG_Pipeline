@@ -4,6 +4,11 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
+## [x] Track: Database Resilience (Phase 5)
+*Link: [./conductor/tracks/database_resilience_20260112/](./conductor/tracks/database_resilience_20260112/)*
+
+---
+
 ## [x] Track: Observability & Monitoring (Phase 4)
 *Link: [./conductor/tracks/observability_20260110/](./conductor/tracks/observability_20260110/)*
 

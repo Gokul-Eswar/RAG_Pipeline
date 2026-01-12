@@ -262,6 +262,36 @@ class Neo4jGraphRepository:
                 raise TimeoutError(f"Query timeout after {timeout}s")
             raise e
 
+    def execute_transaction(self, query: str, parameters: Dict[str, Any] = None, timeout: int = 5) -> List[Dict[str, Any]]:
+        """Execute a Cypher query within a transaction.
+        
+        Args:
+            query: Cypher query to execute
+            parameters: Query parameters
+            timeout: Transaction timeout in seconds
+            
+        Returns:
+            List of result records as dictionaries
+        """
+        if self.driver is None:
+            raise ServiceUnavailable("Neo4j driver not available")
+            
+        try:
+            with self.driver.session() as session:
+                with session.begin_transaction() as tx:
+                    try:
+                        result = tx.run(query, parameters=parameters, timeout=timeout)
+                        records = [record.data() for record in result]
+                        tx.commit()
+                        return records
+                    except Exception as e:
+                        tx.rollback()
+                        raise e
+        except Exception as e:
+            if "Timeout" in str(e) or isinstance(e, TimeoutError):
+                 raise TimeoutError(f"Transaction timeout after {timeout}s")
+            raise e
+
     def create_relationship_transaction(
         self, from_id: int, to_id: int, rel_type: str, timeout: int = 5
     ) -> Dict[str, Any]:
@@ -279,28 +309,20 @@ class Neo4jGraphRepository:
         if self.driver is None:
             return {"error": "Neo4j driver not available"}
 
+        query = (
+            f"MATCH (a), (b) "
+            f"WHERE id(a) = $from_id AND id(b) = $to_id "
+            f"CREATE (a)-[r:{rel_type}]->(b) "
+            f"RETURN id(r) AS rel_id"
+        )
+        params = {"from_id": from_id, "to_id": to_id}
+
         try:
-            with self.driver.session() as session:
-                with session.begin_transaction() as tx:
-                    try:
-                        query = (
-                            f"MATCH (a), (b) "
-                            f"WHERE id(a) = $from_id AND id(b) = $to_id "
-                            f"CREATE (a)-[r:{rel_type}]->(b) "
-                            f"RETURN id(r) AS rel_id"
-                        )
-                        result = tx.run(query, from_id=from_id, to_id=to_id, timeout=timeout)
-                        record = result.single()
-                        tx.commit()
-                        if record:
-                            return {"relationship_id": record["rel_id"], "type": rel_type}
-                        return {"error": "Failed to create relationship"}
-                    except Exception as e:
-                        tx.rollback()
-                        raise e
+            records = self.execute_transaction(query, parameters=params, timeout=timeout)
+            if records:
+                return {"relationship_id": records[0]["rel_id"], "type": rel_type}
+            return {"error": "Failed to create relationship"}
         except Exception as e:
-            if "Timeout" in str(e) or isinstance(e, TimeoutError):
-                 return {"error": f"Transaction timeout after {timeout}s"}
             return {"error": str(e)}
 
     def batch_create_nodes(self, label: str, nodes_data: List[Dict[str, Any]], batch_size: int = 100) -> Dict[str, Any]:
