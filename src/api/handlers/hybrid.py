@@ -1,16 +1,33 @@
 """Hybrid retrieval API endpoints."""
 
-import random
 import re
+import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from src.infrastructure.database.neo4j import Neo4jGraphRepository
 from src.infrastructure.database.qdrant import QdrantVectorRepository
+from src.ai.models.language_models import SentenceTransformerModel
+from src.utils.logging import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/memory/search", tags=["Memory - Hybrid"])
+
+# Initialize embedding model lazily
+_embedding_model = None
+
+def get_embedding_model():
+    """Get or initialize the embedding model."""
+    global _embedding_model
+    if _embedding_model is None:
+        try:
+            _embedding_model = SentenceTransformerModel()
+        except Exception as e:
+            logger.error(f"Failed to initialize embedding model: {e}")
+            raise HTTPException(status_code=500, detail="Embedding service unavailable")
+    return _embedding_model
 
 
 class HybridSearchRequest(BaseModel):
@@ -28,14 +45,17 @@ def extract_keywords(text: str) -> List[str]:
     # Simple split and filter
     words = re.findall(r'\b\w+\b', text.lower())
     stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "with", "is", "are"}
-    return [w for w in words if len(w) > 3 and w not in stop_words]
+    return [w for w in words if len(w) > 2 and w not in stop_words]
 
 
 @router.post("/hybrid", description="Perform hybrid search (Vector + Graph)")
-def search_hybrid(request: HybridSearchRequest):
+def search_hybrid(
+    request: HybridSearchRequest,
+    model: SentenceTransformerModel = Depends(get_embedding_model)
+):
     """Search using both vector similarity and graph relationships.
     
-    1. Converts query text to vector (currently mocked).
+    1. Converts query text to vector using sentence-transformers.
     2. Searches Qdrant for semantically similar items.
     3. Extracts keywords and searches Neo4j for related context.
     4. Combines and returns unified results.
@@ -43,10 +63,14 @@ def search_hybrid(request: HybridSearchRequest):
     if not request.query_text:
         raise HTTPException(status_code=400, detail="query_text is required")
 
-    # 1. Generate Embedding (Mocked for now)
-    # TODO: Integrate with actual LLM service
-    vector_dim = 384
-    query_vector = [random.uniform(-1.0, 1.0) for _ in range(vector_dim)]
+    start_time = time.time()
+    
+    # 1. Generate Embedding
+    try:
+        query_vector = model.embed(request.query_text)
+    except Exception as e:
+        logger.error(f"Embedding generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate query embedding")
 
     # 2. Vector Search (Semantic)
     vector_results = []
@@ -54,24 +78,40 @@ def search_hybrid(request: HybridSearchRequest):
         qdrant = QdrantVectorRepository(request.collection)
         if qdrant.check_connectivity():
             vector_results = qdrant.search(query_vector, request.limit)
+        else:
+            logger.warning("Qdrant connectivity check failed during hybrid search")
     except Exception as e:
-        print(f"Vector search warning: {str(e)}")
+        logger.error(f"Vector search failed: {str(e)}")
 
     # 3. Graph Search (Structural/Relational)
     graph_context = []
+    keywords = []
     try:
         keywords = extract_keywords(request.query_text)
         if keywords:
             neo4j = Neo4jGraphRepository()
             if neo4j.check_connectivity():
                 graph_context = neo4j.query_related_nodes(keywords, limit=request.limit)
+            else:
+                logger.warning("Neo4j connectivity check failed during hybrid search")
             neo4j.close()
     except Exception as e:
-        print(f"Graph search warning: {str(e)}")
+        logger.error(f"Graph search failed: {str(e)}")
 
     # 4. Combine Results
-    # For now, we return them as separate components in the response
+    # Basic combination: return both sets.
     # In a more advanced implementation, we would use graph context to re-rank vector results
+    
+    processing_time = time.time() - start_time
+    logger.info(
+        f"Hybrid search completed in {processing_time:.3f}s",
+        extra={
+            "query": request.query_text,
+            "vector_results_count": len(vector_results),
+            "graph_results_count": len(graph_context),
+            "keywords": keywords
+        }
+    )
     
     return {
         "status": "ok",
@@ -82,7 +122,8 @@ def search_hybrid(request: HybridSearchRequest):
         },
         "meta": {
             "strategy": "hybrid_v1",
-            "keywords_extracted": keywords if 'keywords' in locals() else [],
+            "processing_time_ms": int(processing_time * 1000),
+            "keywords_extracted": keywords,
             "vector_engine": "qdrant",
             "graph_engine": "neo4j"
         }
