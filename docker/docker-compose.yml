@@ -43,17 +43,23 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # Airflow (light scaffold) — replace with your preferred orchestration image/config
+  # Airflow (Custom build with project dependencies)
   airflow:
-    image: apache/airflow:2.9.1
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.airflow
     depends_on:
       - postgres
     environment:
       AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      KAFKA_BROKER: redpanda:9092
+      # Add other necessary env vars for the pipeline code to work inside Airflow
+      NEO4J_URI: bolt://neo4j:7687
+      QDRANT_HOST: qdrant
     ports:
       - "8080:8080"
-    command: bash -c "airflow db upgrade || true; airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true; airflow webserver"
+    command: bash -c "airflow db upgrade || true; airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true; airflow webserver --scheduler"
 
   # Minimal FastAPI app for the API surface
   api:
