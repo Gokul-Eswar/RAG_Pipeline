@@ -69,6 +69,28 @@ services:
       - spark-master
     environment:
       - SPARK_MASTER=spark://spark-master:7077
+      - KAFKA_BROKER=redpanda:9092
+      - NEO4J_URI=bolt://neo4j:7687
+      - QDRANT_HOST=qdrant
+      - LOG_LEVEL=INFO
+
+  # Background Processing Pipeline
+  pipeline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["python", "-m", "src.processing.pipeline"]
+    depends_on:
+      - redpanda
+      - qdrant
+      - neo4j
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_AUTH=neo4j/test
+      - QDRANT_HOST=qdrant
+      - LOG_LEVEL=INFO
+    restart: on-failure
 
   # Spark Master for distributed processing
   spark-master:
