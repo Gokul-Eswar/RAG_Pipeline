@@ -57,6 +57,11 @@ services:
       # Add other necessary env vars for the pipeline code to work inside Airflow
       NEO4J_URI: bolt://neo4j:7687
       QDRANT_HOST: qdrant
+      
+      # Spark Configuration
+      SPARK_MASTER: spark://spark-master:7077
+      AIRFLOW_CONN_SPARK_DEFAULT: spark://spark-master:7077
+      JAVA_HOME: /usr/lib/jvm/default-java
     ports:
       - "8080:8080"
     command: bash -c "airflow db upgrade || true; airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true; airflow webserver --scheduler"

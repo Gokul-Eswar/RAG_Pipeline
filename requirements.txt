@@ -1,6 +1,7 @@
 # Ingestion & Processing
 kafka-python
 pyspark
+apache-airflow-providers-apache-spark
 
 # NLP & Extraction
 spacy

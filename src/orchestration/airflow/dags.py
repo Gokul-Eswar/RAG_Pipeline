@@ -48,11 +48,18 @@ with DAG(
         python_callable=run_rag_batch,
     )
 
-    # Task 3: Transformation (Spark Placeholder)
-    # In a real setup, this might submit a Spark job
-    spark_transform = BashOperator(
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+
+    # Task 3: Transformation (Spark Job)
+    # Offload heavy processing to the Spark Cluster
+    spark_transform = SparkSubmitOperator(
         task_id='spark_transform_job',
-        bash_command='echo "Submitting Spark job..." && sleep 5',
+        application='/opt/airflow/src/processing/spark_job.py',
+        conn_id='spark_default',
+        conf={
+            'spark.master': 'spark://spark-master:7077',
+        },
+        verbose=True
     )
 
     check_health >> process_events >> spark_transform
