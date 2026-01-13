@@ -6,10 +6,10 @@ import pytest
 class TestIngestionWorkflow:
     """Tests for end-to-end ingestion workflow."""
     
-    def test_event_ingestion_flow(self, api_client, sample_event):
+    def test_event_ingestion_flow(self, auth_client, sample_event):
         """Test complete ingestion flow."""
         # Step 1: Ingest event
-        response = api_client.post("/ingest/", json=sample_event)
+        response = auth_client.post("/ingest/", json=sample_event)
         assert response.status_code == 200
         
         # Step 2: Verify response

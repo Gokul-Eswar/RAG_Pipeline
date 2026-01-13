@@ -3,12 +3,27 @@
 import pytest
 from fastapi.testclient import TestClient
 from src.api.main import app
+from src.api.security import get_current_active_user, User
 
 
 @pytest.fixture
 def api_client():
     """FastAPI test client."""
     return TestClient(app)
+
+
+@pytest.fixture
+def auth_client():
+    """Authenticated FastAPI test client."""
+    # Override the dependency for testing
+    def override_get_current_active_user():
+        return User(username="testuser", disabled=False)
+    
+    app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+    client = TestClient(app)
+    yield client
+    # Clean up the override after the test
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
