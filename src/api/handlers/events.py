@@ -24,17 +24,7 @@ class IngestEventRequest(BaseModel):
     metadata: dict | None = None
 
 
-def get_kafka_producer():
-    """Get or create a Kafka producer."""
-    if KafkaProducer is None:
-        return None
-    
-    broker = os.getenv("KAFKA_BROKER", "redpanda:9092")
-    return KafkaProducer(
-        bootstrap_servers=broker,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-    )
-
+from src.infrastructure.messaging.kafka import KafkaEventProducer
 
 @router.get("/health", description="Health check for ingestion service")
 def check_ingestion_health():
@@ -56,13 +46,7 @@ def ingest_event(
         raise HTTPException(status_code=400, detail="text is required")
     
     try:
-        producer = get_kafka_producer()
-        if producer is None:
-            return {
-                "status": "accepted",
-                "id": request.id,
-                "warning": "Kafka producer not available - item queued locally"
-            }
+        producer = KafkaEventProducer()
         
         message = {
             "id": request.id,
@@ -70,19 +54,22 @@ def ingest_event(
             "metadata": request.metadata or {},
         }
         
-        topic = os.getenv("KAFKA_TOPIC_INGESTION", "raw_events")
-        future = producer.send(topic, value=message)
-        record_metadata = future.get(timeout=10)
+        result = producer.publish(message)
         producer.close()
         
-        return {
-            "status": "accepted",
-            "id": request.id,
-            "topic": record_metadata.topic,
-            "partition": record_metadata.partition,
-            "offset": record_metadata.offset,
-        }
-    except KafkaError as e:
-        raise HTTPException(status_code=503, detail=f"Kafka error: {str(e)}")
+        if result:
+            return {
+                "status": "accepted",
+                "id": request.id,
+                **result
+            }
+        else:
+             return {
+                "status": "accepted",
+                "id": request.id,
+                "warning": "Kafka producer not available - item queued locally (simulation)"
+            }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to ingest event: {str(e)}")
+        # Check if it's just a connection error (Circuit Breaker might handle this logging)
+        raise HTTPException(status_code=503, detail=f"Failed to ingest event: {str(e)}")
