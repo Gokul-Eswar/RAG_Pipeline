@@ -45,3 +45,4 @@ conductor/
 
 # Temp
 .gemini/
+.gemini-clipboard/
