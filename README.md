@@ -83,6 +83,38 @@ python run.py api
 | **LLM** | Ollama |
 | **Orchestration**| Airflow |
 
+## 🔗 Official Documentation
+
+### Core Infrastructure
+- [Apache Airflow](https://airflow.apache.org/docs/)
+- [Apache Kafka](https://kafka.apache.org/documentation/)
+- [Apache Spark](https://spark.apache.org/docs/latest/)
+- [Docker](https://docs.docker.com/)
+- [Kubernetes](https://kubernetes.io/docs/home/)
+
+### Databases & Storage
+- [Neo4j](https://neo4j.com/docs/)
+- [Qdrant](https://qdrant.tech/documentation/)
+- [Redis](https://redis.io/docs/)
+
+### AI & Machine Learning
+- [LangChain](https://python.langchain.com/docs/get_started/introduction)
+- [LlamaIndex](https://docs.llamaindex.ai/en/stable/)
+- [Ollama](https://github.com/ollama/ollama/tree/main/docs)
+- [Hugging Face Transformers](https://huggingface.co/docs/transformers/index)
+- [Sentence Transformers](https://www.sbert.net/)
+- [SpaCy](https://spacy.io/usage)
+
+### Backend & API
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [Pydantic](https://docs.pydantic.dev/latest/)
+- [Tenacity](https://tenacity.readthedocs.io/en/latest/)
+
+### Testing & Monitoring
+- [Locust](https://docs.locust.io/en/stable/)
+- [Prometheus](https://prometheus.io/docs/introduction/overview/)
+- [Pytest](https://docs.pytest.org/en/stable/)
+
 ## 🤝 Contributing
 
 See [DEVELOPER.md](DEVELOPER.md) for guidelines on how to contribute.
