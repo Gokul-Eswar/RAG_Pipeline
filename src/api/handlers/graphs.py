@@ -86,7 +86,10 @@ def create_graph_relationship(
 
 
 @router.post("/node/find", description="Find a node by properties")
-def find_graph_node(request: NodeQueryRequest):
+def find_graph_node(
+    request: NodeQueryRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Find a node by label and properties."""
     try:
         repository = Neo4jGraphRepository()

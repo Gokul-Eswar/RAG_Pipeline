@@ -1,8 +1,3 @@
-"""Security module for authentication and authorization."""
-
-from datetime import datetime, timedelta
-from typing import Optional
-from fastapi import Depends, HTTPException, status
 """Security module for authentication and authorization.
 
 This module implements authentication backed by Redis. It keeps compatibility
@@ -207,5 +202,4 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API Key",
         )
-    return api_key
     return api_key

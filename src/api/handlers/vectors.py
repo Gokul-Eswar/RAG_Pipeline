@@ -71,7 +71,10 @@ def upsert_vectors(
 
 
 @router.post("/search", description="Search for similar vectors")
-def search_vectors(request: SearchVectorsRequest):
+def search_vectors(
+    request: SearchVectorsRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Search for similar vectors using semantic similarity.
     
     Expected format:
@@ -95,7 +98,10 @@ def search_vectors(request: SearchVectorsRequest):
 
 
 @router.post("/collection/info", description="Get collection metadata")
-def get_vector_collection_info(request: CollectionInfoRequest):
+def get_vector_collection_info(
+    request: CollectionInfoRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
     """Get information about a vector collection."""
     try:
         repository = QdrantVectorRepository(request.collection)
