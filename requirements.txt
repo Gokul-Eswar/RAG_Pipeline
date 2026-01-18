@@ -8,6 +8,9 @@ spacy
 transformers
 sentence-transformers
 flair
+torch
+accelerate
+optimum
 
 # Database Clients
 pymilvus

@@ -12,17 +12,23 @@ class TestTransformerExtractor:
     
     @patch("src.processing.extraction.nlp.TRANSFORMERS_AVAILABLE", True)
     @patch("src.processing.extraction.nlp.pipeline")
-    def test_rebel_extraction(self, mock_pipeline):
+    @patch("src.processing.extraction.nlp.AutoTokenizer")
+    @patch("src.processing.extraction.nlp.AutoModelForSeq2SeqLM")
+    @patch("src.processing.extraction.nlp.torch") # Mock torch as well
+    def test_rebel_extraction(self, mock_torch, mock_model_cls, mock_tokenizer_cls, mock_pipeline):
         """Test relation extraction with mocked pipeline."""
         
-        # Setup mock
+        # Setup mocks
         mock_pipe_instance = MagicMock()
         mock_pipeline.return_value = mock_pipe_instance
         
-        # Mock return value of the pipeline call
-        # pipeline returns a list of dicts with 'generated_text'
+        # Mock model and tokenizer to avoid real downloads
+        mock_model_cls.from_pretrained.return_value = MagicMock()
+        mock_tokenizer_cls.from_pretrained.return_value = MagicMock()
+        
+        # Mock return value of the pipeline call for single item (batch of 1)
         mock_pipe_instance.return_value = [
-            {"generated_text": SAMPLE_REBEL_OUTPUT}
+            [{"generated_text": SAMPLE_REBEL_OUTPUT}]
         ]
         
         extractor = TransformerExtractor()
@@ -42,8 +48,52 @@ class TestTransformerExtractor:
 
     @patch("src.processing.extraction.nlp.TRANSFORMERS_AVAILABLE", True)
     @patch("src.processing.extraction.nlp.pipeline")
-    def test_parsing_logic_edge_cases(self, mock_pipeline):
+    @patch("src.processing.extraction.nlp.AutoTokenizer")
+    @patch("src.processing.extraction.nlp.AutoModelForSeq2SeqLM")
+    @patch("src.processing.extraction.nlp.torch")
+    def test_rebel_batch_extraction(self, mock_torch, mock_model_cls, mock_tokenizer_cls, mock_pipeline):
+        """Test batch relation extraction."""
+        
+        # Setup mocks
+        mock_pipe_instance = MagicMock()
+        mock_pipeline.return_value = mock_pipe_instance
+        mock_model_cls.from_pretrained.return_value = MagicMock()
+        mock_tokenizer_cls.from_pretrained.return_value = MagicMock()
+        
+        # Mock return value for batch of 2 items
+        mock_pipe_instance.return_value = [
+            [{"generated_text": "<triplet> Apple <subj> Steve Jobs <obj> founded by"}], # Item 1
+            [{"generated_text": "<triplet> Microsoft <subj> Bill Gates <obj> founded by"}] # Item 2
+        ]
+        
+        # Enable sports mode to trigger logic, but mocked torch ensures no real GPU/Compile calls
+        # mock_torch.cuda.is_available.return_value = True # Simulate GPU if needed
+        
+        extractor = TransformerExtractor(sports_mode=True)
+        texts = ["Apple was founded by Steve Jobs.", "Microsoft was founded by Bill Gates."]
+        results_batch = extractor.extract_relations_batch(texts)
+        
+        assert len(results_batch) == 2
+        
+        # Check Item 1
+        assert results_batch[0][0]['head'] == 'Apple'
+        assert results_batch[0][0]['tail'] == 'Steve Jobs'
+        
+        # Check Item 2
+        assert results_batch[1][0]['head'] == 'Microsoft'
+        assert results_batch[1][0]['tail'] == 'Bill Gates'
+
+    @patch("src.processing.extraction.nlp.TRANSFORMERS_AVAILABLE", True)
+    @patch("src.processing.extraction.nlp.pipeline") # still patch pipeline as it's used in __init__
+    @patch("src.processing.extraction.nlp.AutoTokenizer")
+    @patch("src.processing.extraction.nlp.AutoModelForSeq2SeqLM")
+    @patch("src.processing.extraction.nlp.torch")
+    def test_parsing_logic_edge_cases(self, mock_torch, mock_model, mock_tokenizer, mock_pipeline):
         """Test parsing logic with messy output."""
+        # Setup minimal mocks for init
+        mock_model.from_pretrained.return_value = MagicMock()
+        mock_tokenizer.from_pretrained.return_value = MagicMock()
+        
         extractor = TransformerExtractor()
         
         # Case: Missing tags

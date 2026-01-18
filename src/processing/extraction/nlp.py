@@ -1,7 +1,7 @@
 """NLP extraction pipeline."""
 
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 try:
     import spacy
@@ -11,10 +11,12 @@ except ImportError:
     SPACY_AVAILABLE = False
 
 try:
-    from transformers import pipeline
+    from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
+    import torch
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     pipeline = None
+    torch = None
     TRANSFORMERS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -129,21 +131,49 @@ class SpacyExtractor(NLPExtractor):
 class TransformerExtractor(NLPExtractor):
     """Advanced NLP extraction using Hugging Face Transformers (REBEL)."""
     
-    def __init__(self, model_name: str = "Babelscape/rebel-large", use_gpu: bool = False):
+    def __init__(self, model_name: str = "Babelscape/rebel-large", use_gpu: bool = False, sports_mode: bool = False):
         """Initialize the REBEL model pipeline.
         
         Args:
             model_name: HF model name for REBEL
             use_gpu: Whether to use GPU if available
+            sports_mode: Enable high-performance optimizations (FP16, torch.compile, batching params)
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError("transformers library is not available. Install it to use TransformerExtractor.")
         
-        device = 0 if use_gpu else -1
+        self.sports_mode = sports_mode
+        self.device = 0 if use_gpu and torch.cuda.is_available() else -1
+        
         try:
-            self.pipe = pipeline("text2text-generation", model=model_name, tokenizer=model_name, device=device)
-            self.tokenizer = self.pipe.tokenizer
-            logger.info(f"Loaded REBEL model: {model_name}")
+            # Model loading strategy
+            load_kwargs = {}
+            if self.sports_mode and torch.cuda.is_available():
+                logger.info("🏎️ SPORTS MODE ENABLED: Using FP16 precision")
+                load_kwargs["torch_dtype"] = torch.float16
+                # If accelerator is present, we could use device_map="auto" but sticking to explicit device for now for safety
+                
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_name, **load_kwargs)
+
+            # PyTorch 2.0 Compilation (The "Turbo Button")
+            if self.sports_mode and hasattr(torch, "compile"):
+                try:
+                    logger.info("🏎️ SPORTS MODE ENABLED: Compiling model with torch.compile()...")
+                    model = torch.compile(model)
+                except Exception as e:
+                    logger.warning(f"Could not compile model: {e}")
+
+            # Initialize pipeline
+            self.pipe = pipeline(
+                "text2text-generation", 
+                model=model, 
+                tokenizer=tokenizer, 
+                device=self.device
+            )
+            self.tokenizer = tokenizer
+            logger.info(f"Loaded REBEL model: {model_name} (Sports Mode: {sports_mode})")
+            
         except Exception as e:
             logger.error(f"Failed to load transformer model '{model_name}': {e}")
             self.pipe = None
@@ -168,8 +198,22 @@ class TransformerExtractor(NLPExtractor):
         Returns:
             List of dicts: {'head': str, 'type': str, 'tail': str}
         """
+        # Delegate to batch method for single item
+        results = self.extract_relations_batch([text])
+        return results[0] if results else []
+
+    def extract_relations_batch(self, texts: List[str], batch_size: int = 8) -> List[List[Dict[str, Any]]]:
+        """Extract relations from a batch of texts.
+        
+        Args:
+            texts: List of input texts
+            batch_size: Number of texts to process in parallel
+            
+        Returns:
+            List of lists, where each inner list contains relations for the corresponding input text.
+        """
         if not self.pipe:
-            return []
+            return [[] for _ in texts]
 
         # REBEL generation parameters
         gen_kwargs = {
@@ -177,26 +221,44 @@ class TransformerExtractor(NLPExtractor):
             "length_penalty": 0,
             "num_beams": 3,
             "num_return_sequences": 3,
+            "batch_size": batch_size if self.sports_mode else 1
         }
 
-        generated_results = self.pipe(text, **gen_kwargs)
+        all_results = []
         
-        triplets = []
-        for result in generated_results:
-            generated_text = result['generated_text']
-            extracted = self._parse_rebel_output(generated_text)
-            triplets.extend(extracted)
+        # Process in pipeline
+        # pipeline() with a list input automatically handles batching if batch_size is set
+        pipeline_outputs = self.pipe(texts, **gen_kwargs)
+        
+        # pipeline returns a list of lists of dicts (if num_return_sequences > 1) 
+        # or list of dicts (if num_return_sequences == 1). 
+        # For REBEL we usually have num_return_sequences=3, so we get [[{...}, ...], [{...}, ...]]
+        
+        for i, output_group in enumerate(pipeline_outputs):
+            # output_group is a list of generated sequences for a single input text
+            # e.g., [{'generated_text': '...'}, {'generated_text': '...'}]
             
-        # Deduplicate
-        unique_triplets = []
-        seen = set()
-        for t in triplets:
-            key = (t['head'], t['type'], t['tail'])
-            if key not in seen:
-                seen.add(key)
-                unique_triplets.append(t)
+            triplets = []
+            if isinstance(output_group, dict): # Handle case where return_sequences=1
+                output_group = [output_group]
                 
-        return unique_triplets
+            for result in output_group:
+                generated_text = result['generated_text']
+                extracted = self._parse_rebel_output(generated_text)
+                triplets.extend(extracted)
+            
+            # Deduplicate per input text
+            unique_triplets = []
+            seen = set()
+            for t in triplets:
+                key = (t['head'], t['type'], t['tail'])
+                if key not in seen:
+                    seen.add(key)
+                    unique_triplets.append(t)
+            
+            all_results.append(unique_triplets)
+                
+        return all_results
 
     def _parse_rebel_output(self, text: str) -> List[Dict[str, str]]:
         """Parse the custom token format of REBEL."""
@@ -212,12 +274,8 @@ class TransformerExtractor(NLPExtractor):
                 continue
                 
             # REBEL format: <triplet> subject <subj> object <obj> relation
-            # Note: The raw output often needs careful splitting
-            # A common reliable decoding pattern for REBEL:
-            
             try:
                 # Split by <subj> and <obj>
-                # Expected format in part: " Subject Name <subj> Object Name <obj> Relation Name "
                 if "<subj>" in part and "<obj>" in part:
                     sub_split = part.split("<subj>")
                     subj = sub_split[0].strip()
