@@ -16,6 +16,8 @@ try:
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     pipeline = None
+    AutoModelForSeq2SeqLM = None
+    AutoTokenizer = None
     torch = None
     TRANSFORMERS_AVAILABLE = False
 
