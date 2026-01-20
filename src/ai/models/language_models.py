@@ -38,6 +38,18 @@ class LanguageModel:
         """
         raise NotImplementedError
 
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for a batch of texts.
+        
+        Args:
+            texts: List of input texts
+            
+        Returns:
+            List of embedding vectors
+        """
+        # Default implementation: loop
+        return [self.embed(t) for t in texts]
+
 
 class SentenceTransformerModel(LanguageModel):
     """Local embedding model using sentence-transformers."""
@@ -69,6 +81,13 @@ class SentenceTransformerModel(LanguageModel):
         if isinstance(embedding, np.ndarray):
             return embedding.tolist()
         return embedding
+
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings for a batch of texts efficiently."""
+        embeddings = self.model.encode(texts)
+        if isinstance(embeddings, np.ndarray):
+            return embeddings.tolist()
+        return embeddings
 
 
 class OllamaModel(LanguageModel):

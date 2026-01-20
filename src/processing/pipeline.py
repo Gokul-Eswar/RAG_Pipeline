@@ -34,13 +34,14 @@ class RAGPipeline:
         
         count = 0
         try:
-            # Consumes indefinitely
-            for event in self.consumer.consume():
+            # Consume in batches for efficiency
+            # Default batch size 10, poll timeout 1s
+            for batch in self.consumer.consume_batches(batch_size=10, timeout_ms=1000):
                 if not self.running:
                     break
                     
-                self._process_event(event)
-                count += 1
+                self._process_batch(batch)
+                count += len(batch)
                 
                 if limit and count >= limit:
                     logger.info(f"Reached limit of {limit} events. Stopping.")
@@ -53,8 +54,41 @@ class RAGPipeline:
         finally:
             self.stop()
 
+    def _process_batch(self, batch: list[dict]):
+        """Process a batch of events."""
+        if not batch:
+            return
+
+        logger.info(f"Processing batch of {len(batch)} events...")
+        
+        try:
+            # Transform batch to expected format (if needed)
+            # Processor expects [{'id': ..., 'text': ..., 'metadata': ...}]
+            # Assuming event structure matches or needs slight mapping
+            clean_batch = []
+            for event in batch:
+                clean_batch.append({
+                    "id": event.get("id"),
+                    "text": event.get("text"),
+                    "metadata": event.get("metadata", {})
+                })
+            
+            results = self.processor.process_batch(clean_batch)
+            
+            success_count = 0
+            for res in results:
+                if res.get("errors"):
+                    logger.error(f"Event {res['id']} failed: {res['errors']}")
+                else:
+                    success_count += 1
+            
+            logger.info(f"Batch completed: {success_count}/{len(batch)} successful")
+                
+        except Exception as e:
+            logger.error(f"Failed to process batch: {e}")
+
     def _process_event(self, event: dict):
-        """Process a single event."""
+        """Process a single event (Legacy/Fallback)."""
         event_id = event.get("id")
         text = event.get("text")
         metadata = event.get("metadata", {})

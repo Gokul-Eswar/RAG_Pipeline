@@ -52,6 +52,18 @@ class NLPExtractor:
         """
         raise NotImplementedError
 
+    def extract_relations_batch(self, texts: List[str], batch_size: int = 8) -> List[List[Dict[str, Any]]]:
+        """Extract relations from a batch of texts.
+        
+        Args:
+            texts: List of input texts
+            batch_size: Number of texts to process in parallel (if supported)
+            
+        Returns:
+            List of lists of relations
+        """
+        return [self.extract_relations(text) for text in texts]
+
 
 class SpacyExtractor(NLPExtractor):
     """NLP extraction using spaCy."""

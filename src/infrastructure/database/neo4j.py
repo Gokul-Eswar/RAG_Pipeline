@@ -367,6 +367,96 @@ class Neo4jGraphRepository:
             "batches_failed": errors
         }
 
+    def batch_create_relationships(
+        self, 
+        rels_data: List[Dict[str, Any]], 
+        batch_size: int = 100
+    ) -> Dict[str, Any]:
+        """Create multiple relationships in batches.
+        
+        Args:
+            rels_data: List of dicts with 'from_label', 'from_props', 'to_label', 'to_props', 'type', 'props'
+                       Example: {
+                           "from_label": "Document", "from_props": {"id": "1"},
+                           "to_label": "Entity", "to_props": {"name": "Paris"},
+                           "type": "MENTIONS", "props": {"confidence": 0.9}
+                       }
+            batch_size: Transaction batch size
+        
+        Returns:
+            Summary of operations
+        """
+        if self.driver is None:
+            return {"error": "Neo4j driver not available"}
+
+        total_created = 0
+        errors = 0
+
+        for i in range(0, len(rels_data), batch_size):
+            batch = rels_data[i:i+batch_size]
+            try:
+                with self.driver.session() as session:
+                    # This query assumes we are matching existing nodes. 
+                    # Use MERGE to ensure we don't duplicate if relations already exist.
+                    query = """
+                    UNWIND $batch AS item
+                    MATCH (a) WHERE labels(a) = [item.from_label] AND all(k IN keys(item.from_props) WHERE a[k] = item.from_props[k])
+                    MATCH (b) WHERE labels(b) = [item.to_label] AND all(k IN keys(item.to_props) WHERE b[k] = item.to_props[k])
+                    MERGE (a)-[r:RELATIONSHIP {type: item.type}]->(b)
+                    SET r = item.props
+                    WITH r, item
+                    call apoc.create.setRelType(r, item.type) YIELD rel
+                    RETURN count(r) as created
+                    """
+                    # Dynamic relationship types in pure Cypher are tricky without APOC.
+                    # Simplified approach: Group by relationship type and labels.
+                    # For now, let's assume we pass specific queries or handle dynamic types via string injection (safe if internal).
+                    
+                    # Better approach: Group by Rel Type
+                    pass 
+            except Exception:
+                pass
+        
+        # Refined implementation grouping by Relationship Type to avoid APOC dependency
+        # Group by (from_label, to_label, type)
+        grouped = {}
+        for item in rels_data:
+            key = (item['from_label'], item['to_label'], item['type'])
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(item)
+            
+        for (from_lbl, to_lbl, r_type), items in grouped.items():
+            for i in range(0, len(items), batch_size):
+                batch = items[i:i+batch_size]
+                try:
+                    with self.driver.session() as session:
+                        # Construct props match string for performance? 
+                        # Ideally we match by ID if possible, but here we support generic props.
+                        # We'll assume matching by ID or unique prop is best.
+                        
+                        query = (
+                            f"UNWIND $batch AS item "
+                            f"MATCH (a:{from_lbl}) WHERE all(k IN keys(item.from_props) WHERE a[k] = item.from_props[k]) "
+                            f"MATCH (b:{to_lbl}) WHERE all(k IN keys(item.to_props) WHERE b[k] = item.to_props[k]) "
+                            f"MERGE (a)-[r:{r_type}]->(b) "
+                            f"SET r = item.props "
+                            f"RETURN count(r) as created"
+                        )
+                        result = session.run(query, batch=batch)
+                        record = result.single()
+                        if record:
+                            total_created += record["created"]
+                except Exception as e:
+                    print(f"Batch rel error: {e}")
+                    errors += 1
+
+        return {
+            "total_created": total_created,
+            "batches_processed": (len(rels_data) + batch_size - 1) // batch_size,
+            "batches_failed": errors
+        }
+
     def close(self):
         """Close the Neo4j driver connection."""
         if self.driver:

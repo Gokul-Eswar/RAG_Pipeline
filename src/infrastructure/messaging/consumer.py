@@ -74,6 +74,43 @@ class KafkaEventConsumer:
                     # In a real app, we might want to DLQ this or pause
         except Exception as e:
             logger.error(f"Consumption error: {e}")
+
+    def consume_batches(self, batch_size: int = 10, timeout_ms: int = 1000) -> Generator[list[Dict[str, Any]], None, None]:
+        """Consume messages in batches.
+        
+        Args:
+            batch_size: Max messages per batch
+            timeout_ms: Polling timeout
+            
+        Yields:
+            List of message dictionaries
+        """
+        if not self.consumer:
+            logger.error("Kafka consumer not available")
+            return
+
+        logger.info(f"Starting batch consumption from {self.topic}...")
+        
+        try:
+            while True:
+                # Poll returns a dict of {TopicPartition: [messages]}
+                message_batch = self.consumer.poll(timeout_ms=timeout_ms, max_records=batch_size)
+                
+                if not message_batch:
+                    continue
+                    
+                flattened_batch = []
+                for partition_batch in message_batch.values():
+                    for message in partition_batch:
+                        flattened_batch.append(message.value)
+                
+                if flattened_batch:
+                    yield flattened_batch
+                    # Commit the offsets for the whole batch after yielding
+                    self.consumer.commit()
+                    
+        except Exception as e:
+            logger.error(f"Batch consumption error: {e}")
             
     def close(self):
         """Close the consumer connection."""
