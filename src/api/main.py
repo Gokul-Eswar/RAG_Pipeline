@@ -13,6 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from src.api.handlers import auth_router, events_router, vectors_router, graphs_router, hybrid_router
+from src.api.ui import ui_router
 from src.infrastructure.database.neo4j import Neo4jGraphRepository
 from src.infrastructure.database.qdrant import QdrantVectorRepository
 from src.utils.config import Config
@@ -176,10 +177,12 @@ def create_app() -> FastAPI:
             "message": "Big Data RAG API",
             "description": "Real-time RAG Brain with streaming data, knowledge graphs, and vector databases",
             "version": "0.1.0",
+            "ui": "/ui",
             "documentation": "/docs"
         }
 
     # Include routers
+    app.include_router(ui_router)
     app.include_router(auth_router)
     app.include_router(events_router)
     app.include_router(vectors_router)
