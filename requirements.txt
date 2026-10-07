@@ -44,9 +44,3 @@ ollama
 python-dotenv
 requests
 pydantic
-
-# Dev / CI
-pytest
-black
-flake8
-locust

@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build, Test and Deploy
 
 on:
   push:
@@ -6,12 +6,25 @@ on:
   pull_request:
     branches: [ "main" ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   test:
+    name: Lint, Test & Coverage
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:7
+        image: redis:7-alpine
         ports:
           - 6379:6379
         options: >-
@@ -21,58 +34,150 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Run Tests
-      env:
-        REDIS_HOST: localhost
-        NEO4J_AUTH: neo4j/test
-      run: |
-        pytest tests/unit
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-  build:
+      - name: Set up Java 17 (Required by PySpark)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint Code with Flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 src tests --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warning level for style checks
+          flake8 src tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Verify Code Formatting (Black)
+        run: |
+          black --check --diff src tests scripts || echo "Code formatting diffs found. Run 'black .' locally."
+
+      - name: Run Unit Tests with Coverage
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          NEO4J_AUTH: neo4j/test
+        run: |
+          pytest tests/unit --cov=src --cov-report=term --cov-report=xml:coverage.xml
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  build-and-push:
+    name: Build & Publish Container Image
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Build Docker image
-      run: |
-        docker build . --file docker/Dockerfile --tag big-data-rag:latest
-    
-    # In a real pipeline, we would push to a registry (DockerHub, ECR, GCR)
-    # - name: Push to Registry
-    #   run: docker push registry/big-data-rag:${{ github.sha }}
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
-    needs: build
+    name: Deploy to Kubernetes
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set K8s Context
-      run: echo "Simulating Kubeconfig setup..."
-      
-    - name: Deploy to Kubernetes
-      run: |
-        # In a real environment:
-        # kubectl apply -f k8s/configmap.yaml
-        # kubectl apply -f k8s/secrets.yaml
-        # kubectl apply -f k8s/deployment.yaml
-        # kubectl apply -f k8s/service.yaml
-        # kubectl rollout status deployment/big-data-rag-api
-        echo "Deploying manifests..."
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Image Tag
+        id: image_info
+        run: |
+          # Lowercase repo name for valid Docker image reference
+          LOWER_REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "IMAGE=${{ env.REGISTRY }}/${LOWER_REPO}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Using image: ${{ env.REGISTRY }}/${LOWER_REPO}:${SHORT_SHA}"
+
+      - name: Check KUBECONFIG Secret
+        id: check_k8s
+        run: |
+          if [ -n "${{ secrets.KUBECONFIG }}" ]; then
+            echo "has_kubeconfig=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_kubeconfig=false" >> $GITHUB_OUTPUT
+            echo "::warning::KUBECONFIG secret is not configured. Skipping remote Kubernetes deployment."
+          fi
+
+      - name: Set Kubernetes Context
+        if: steps.check_k8s.outputs.has_kubeconfig == 'true'
+        uses: azure/k8s-set-context@v4
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      - name: Deploy Manifests & Update Image
+        if: steps.check_k8s.outputs.has_kubeconfig == 'true'
+        env:
+          NEW_IMAGE: ${{ steps.image_info.outputs.IMAGE }}
+        run: |
+          # Apply foundational configuration and services
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/service.yaml
+          
+          # Deploy application and update to newly built immutable image tag
+          kubectl apply -f k8s/deployment.yaml
+          kubectl set image deployment/big-data-rag-api api=${NEW_IMAGE}
+          
+          # Verify rollout status
+          echo "Verifying rollout status..."
+          kubectl rollout status deployment/big-data-rag-api --timeout=180s
+
+      - name: Rollback on Deployment Failure
+        if: steps.check_k8s.outputs.has_kubeconfig == 'true' && failure()
+        run: |
+          echo "Deployment timed out or failed healthchecks! Rolling back to previous revision..."
+          kubectl rollout undo deployment/big-data-rag-api
+          kubectl rollout status deployment/big-data-rag-api --timeout=120s
