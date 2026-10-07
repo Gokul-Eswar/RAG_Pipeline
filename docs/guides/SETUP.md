@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **OS**: Linux, macOS, or Windows (WSL2 recommended)
-- **Python**: 3.11+
+- **Python**: 3.13+
 - **Docker**: Docker Desktop or Engine + Compose
 - **Ollama**: For local LLM inference (install from [ollama.ai](https://ollama.ai))
 - **Hardware**: 8GB RAM minimum (16GB recommended for LLMs)
