@@ -4,6 +4,7 @@ from datetime import timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.utils.dates import days_ago
 
 from src.processing.pipeline import RAGPipeline
@@ -47,8 +48,6 @@ with DAG(
         task_id='process_events_batch',
         python_callable=run_rag_batch,
     )
-
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
     # Task 3: Transformation (Spark Job)
     # Offload heavy processing to the Spark Cluster

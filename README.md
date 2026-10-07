@@ -1,7 +1,7 @@
 # Big Data RAG
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)]()
+[![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
 
 **An autonomous intelligence substrate integrating streaming data, knowledge graphs, and vector databases to create a living, updating digital brain.**
@@ -42,7 +42,7 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for deep dive.
 
 ### Prerequisites
 - Docker & Docker Compose
-- Python 3.11+
+- Python 3.13+
 
 ### 1. Start Infrastructure
 ```bash
